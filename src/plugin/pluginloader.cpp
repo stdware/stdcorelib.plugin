@@ -321,11 +321,6 @@ namespace stdc::plugin {
         return impl.unloadLibrary();
     }
 
-    bool PluginLoader::isLoaded() const {
-        stdc_impl_t;
-        return impl.state == Loaded;
-    }
-
     Plugin *PluginLoader::plugin() const {
         stdc_impl_t;
         return impl.plugin;

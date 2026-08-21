@@ -120,7 +120,9 @@ namespace stdc::plugin {
         /// this function on one returns false.
         bool unload();
 
-        bool isLoaded() const;
+        inline bool isLoaded() const {
+            return state() == Loaded;
+        }
 
         /// The loaded instance, or null while \c state() is below \c Loaded.
         Plugin *plugin() const;
