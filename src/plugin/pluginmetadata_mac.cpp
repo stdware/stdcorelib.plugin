@@ -2,14 +2,12 @@
 
 #include "pluginmetadata_p.h"
 
-#ifdef __APPLE__
-
-#  include <cstring>
-#  include <fstream>
-#  include <libkern/OSByteOrder.h>
-#  include <mach-o/fat.h>
-#  include <mach-o/loader.h>
-#  include <utility>
+#include <cstring>
+#include <fstream>
+#include <libkern/OSByteOrder.h>
+#include <mach-o/fat.h>
+#include <mach-o/loader.h>
+#include <utility>
 
 namespace fs = std::filesystem;
 
@@ -131,5 +129,3 @@ namespace stdc::plugin {
     }
 
 }
-
-#endif

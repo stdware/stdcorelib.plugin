@@ -2,13 +2,11 @@
 
 #include "pluginmetadata_p.h"
 
-#if !defined(_WIN32) && !defined(__APPLE__)
-
-#  include <cstring>
-#  include <elf.h>
-#  include <fstream>
-#  include <utility>
-#  include <vector>
+#include <cstring>
+#include <elf.h>
+#include <fstream>
+#include <utility>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -77,5 +75,3 @@ namespace stdc::plugin {
     }
 
 }
-
-#endif

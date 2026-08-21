@@ -2,9 +2,7 @@
 
 #include "pluginmetadata_p.h"
 
-#ifdef _WIN32
-
-#  include <stdcorelib/platform/windows/stdc_windows.h>
+#include <stdcorelib/platform/windows/stdc_windows.h>
 
 namespace fs = std::filesystem;
 
@@ -41,5 +39,3 @@ namespace stdc::plugin {
     }
 
 }
-
-#endif
