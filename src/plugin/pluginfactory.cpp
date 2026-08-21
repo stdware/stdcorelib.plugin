@@ -72,7 +72,7 @@ namespace stdc::plugin {
         }
     }
 
-    PluginFactory::PluginFactory() : _impl(new Impl()) {
+    PluginFactory::PluginFactory() : _impl(std::make_unique<Impl>()) {
     }
 
     PluginFactory::PluginFactory(Impl &impl) : _impl(&impl) {

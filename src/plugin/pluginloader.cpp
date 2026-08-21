@@ -244,7 +244,7 @@ namespace stdc::plugin {
         return true;
     }
 
-    PluginLoader::PluginLoader() : _impl(new Impl()) {
+    PluginLoader::PluginLoader() : _impl(std::make_unique<Impl>()) {
     }
 
     PluginLoader::PluginLoader(const std::filesystem::path &filePath,
