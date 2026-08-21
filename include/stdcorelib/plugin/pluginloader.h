@@ -43,6 +43,7 @@ namespace stdc::plugin {
         PluginLoader(PluginLoader &&RHS) noexcept;
         PluginLoader &operator=(PluginLoader &&RHS) noexcept;
 
+        /// Where the selected plugin instance comes from.
         enum Origin {
             /// A shared library on the filesystem.
             FileSystem,
@@ -52,6 +53,7 @@ namespace stdc::plugin {
             Runtime,
         };
 
+        /// The current metadata reading and plugin loading state.
         enum State {
             /// No plugin has been selected.
             Null,
