@@ -87,6 +87,9 @@ namespace {
         BOOST_REQUIRE_EQUAL(rescanned.size(), 1u);
         BOOST_CHECK_EQUAL(rescanned.front(), specs.front());
 
+        system.shutdownPlugins();
+        BOOST_CHECK_EQUAL(specs.front()->state(), stdc::pluginsystem::PluginSpec::Read);
+
         const auto pathsBeforeLoad = system.pluginPaths();
         system.loadPlugins();
         BOOST_CHECK_EQUAL(specs.front()->state(), stdc::pluginsystem::PluginSpec::Running);
@@ -103,6 +106,11 @@ namespace {
 
         system.loadPlugins();
         BOOST_CHECK_EQUAL(specs.front()->state(), stdc::pluginsystem::PluginSpec::Running);
+
+        system.shutdownPlugins();
+        BOOST_CHECK_EQUAL(specs.front()->state(), stdc::pluginsystem::PluginSpec::Stopped);
+        system.shutdownPlugins();
+        BOOST_CHECK_EQUAL(specs.front()->state(), stdc::pluginsystem::PluginSpec::Stopped);
     }
 
 }

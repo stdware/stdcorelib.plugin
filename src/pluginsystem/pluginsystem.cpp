@@ -88,6 +88,10 @@ namespace stdc::pluginsystem {
         }
     }
 
+    PluginSystem::Impl::~Impl() {
+        shutdownPlugins();
+    }
+
     void PluginSystem::Impl::resolveDependencies() {
         resolvedDependencies.clear();
         loadOrder.clear();
@@ -276,6 +280,34 @@ namespace stdc::pluginsystem {
         return result;
     }
 
+    void PluginSystem::Impl::shutdownPlugins() {
+        std::lock_guard<std::mutex> lifecycleLock(lifecycleMtx);
+        if (!loadStarted || shutdownFinished) {
+            return;
+        }
+        shutdownFinished = true;
+
+        for (auto it = loadOrder.rbegin(); it != loadOrder.rend(); ++it) {
+            auto data = *it;
+            if (data->state == PluginSpec::Running) {
+                data->plugin->aboutToShutdown();
+            }
+        }
+
+        for (auto it = loadOrder.rbegin(); it != loadOrder.rend(); ++it) {
+            auto data = *it;
+            if (!data->loader->isLoaded()) {
+                continue;
+            }
+            if (!data->loader->unload()) {
+                data->reportError(data->loader->errorMessage(), data->state);
+                continue;
+            }
+            data->plugin = nullptr;
+            data->state = PluginSpec::Stopped;
+        }
+    }
+
     PluginSystem::PluginSystem(std::string_view iid, PluginLayout layout)
         : _impl(std::make_unique<Impl>(std::string(iid), layout)) {
     }
@@ -325,9 +357,10 @@ namespace stdc::pluginsystem {
 
     void PluginSystem::loadPlugins() {
         stdc_impl_t;
+        std::lock_guard<std::mutex> lifecycleLock(impl.lifecycleMtx);
         {
             std::unique_lock<std::shared_mutex> lock(impl.configMtx);
-            if (impl.loadStarted) {
+            if (impl.loadStarted || impl.shutdownFinished) {
                 return;
             }
             impl.plugins(true);
@@ -381,6 +414,11 @@ namespace stdc::pluginsystem {
             data->plugin->pluginInitialized();
             data->state = PluginSpec::Running;
         }
+    }
+
+    void PluginSystem::shutdownPlugins() {
+        stdc_impl_t;
+        impl.shutdownPlugins();
     }
 
     bool PluginSystem::hasError() const {

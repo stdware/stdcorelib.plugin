@@ -55,6 +55,12 @@ namespace stdc::pluginsystem {
         /// Loads and initializes every valid plugin once. Errors remain on each PluginSpec.
         void loadPlugins();
 
+        /// Shuts down and unloads plugins in reverse dependency order.
+        ///
+        /// Repeated calls and calls before loadPlugins() have no effect. The destructor calls this
+        /// function automatically.
+        void shutdownPlugins();
+
         /// Whether any plugin has an error.
         bool hasError() const;
 
