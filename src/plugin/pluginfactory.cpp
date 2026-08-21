@@ -28,14 +28,16 @@ namespace stdc::plugin {
         return std::make_unique<PluginLoader>();
     }
 
-    void PluginFactory::Impl::scanPlugins(const char *iid) const {
+    void PluginFactory::Impl::scanPlugins(std::string_view iid) const {
         auto it = pluginPaths.find(iid);
         if (it == pluginPaths.end()) {
-            pluginsDirty.erase(iid);
+            if (auto dirty = pluginsDirty.find(iid); dirty != pluginsDirty.end()) {
+                pluginsDirty.erase(dirty);
+            }
             return;
         }
 
-        auto &known = loaders[iid];
+        auto &known = loaders[std::string(iid)];
         for (const auto &root : it->second) {
             std::error_code ec;
             fs::directory_iterator dir(root, ec);
@@ -77,7 +79,9 @@ namespace stdc::plugin {
             }
         }
 
-        pluginsDirty.erase(iid);
+        if (auto dirty = pluginsDirty.find(iid); dirty != pluginsDirty.end()) {
+            pluginsDirty.erase(dirty);
+        }
     }
 
     PluginFactory::PluginFactory() : _impl(new Impl(this)) {
@@ -88,7 +92,7 @@ namespace stdc::plugin {
 
     PluginFactory::~PluginFactory() = default;
 
-    void PluginFactory::addStaticPlugins(const char *pluginSet) {
+    void PluginFactory::addStaticPlugins(std::string_view pluginSet) {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
@@ -119,17 +123,18 @@ namespace stdc::plugin {
         impl.loaders[loader->iid()].emplace_back(std::move(loader));
     }
 
-    void PluginFactory::addPluginPath(const char *iid, const std::filesystem::path &path) {
+    void PluginFactory::addPluginPath(std::string_view iid, const std::filesystem::path &path) {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
         if (!fs::is_directory(path)) {
             return;
         }
-        impl.pluginPaths[iid].push_back(fs::canonical(path));
-        impl.pluginsDirty.insert(iid);
+        impl.pluginPaths[std::string(iid)].push_back(fs::canonical(path));
+        impl.pluginsDirty.insert(std::string(iid));
     }
 
-    void PluginFactory::setPluginPaths(const char *iid, array_view<std::filesystem::path> paths) {
+    void PluginFactory::setPluginPaths(std::string_view iid,
+                                       array_view<std::filesystem::path> paths) {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
@@ -142,14 +147,16 @@ namespace stdc::plugin {
             realPaths.push_back(fs::canonical(path));
         }
         if (realPaths.empty()) {
-            impl.pluginPaths.erase(iid);
+            if (auto it = impl.pluginPaths.find(iid); it != impl.pluginPaths.end()) {
+                impl.pluginPaths.erase(it);
+            }
         } else {
-            impl.pluginPaths[iid] = std::move(realPaths);
+            impl.pluginPaths[std::string(iid)] = std::move(realPaths);
         }
-        impl.pluginsDirty.insert(iid);
+        impl.pluginsDirty.insert(std::string(iid));
     }
 
-    std::vector<std::filesystem::path> PluginFactory::pluginPaths(const char *iid) const {
+    std::vector<std::filesystem::path> PluginFactory::pluginPaths(std::string_view iid) const {
         stdc_impl_t;
         std::shared_lock<std::shared_mutex> lock(impl.plugins_mtx);
         auto it = impl.pluginPaths.find(iid);
@@ -159,7 +166,7 @@ namespace stdc::plugin {
         return {it->second.begin(), it->second.end()};
     }
 
-    std::vector<PluginLoader *> PluginFactory::plugins(const char *iid) const {
+    std::vector<PluginLoader *> PluginFactory::plugins(std::string_view iid) const {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 

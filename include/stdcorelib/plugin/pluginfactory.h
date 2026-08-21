@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <stdcorelib/adt/array_view.h>
@@ -43,7 +44,7 @@ namespace stdc::plugin {
         ///
         /// Which extension point each one plugs into comes out of its metadata, exactly as it
         /// would for a plugin on disk.
-        void addStaticPlugins(const char *pluginSet);
+        void addStaticPlugins(std::string_view pluginSet);
 
         /// Takes an instance the program already holds. Ownership stays with the program.
         ///
@@ -53,9 +54,9 @@ namespace stdc::plugin {
     public:
         /// Adds a directory to search for \a iid. Each subdirectory holding a plugin.json is one
         /// plugin.
-        void addPluginPath(const char *iid, const std::filesystem::path &path);
-        void setPluginPaths(const char *iid, array_view<std::filesystem::path> paths);
-        std::vector<std::filesystem::path> pluginPaths(const char *iid) const;
+        void addPluginPath(std::string_view iid, const std::filesystem::path &path);
+        void setPluginPaths(std::string_view iid, array_view<std::filesystem::path> paths);
+        std::vector<std::filesystem::path> pluginPaths(std::string_view iid) const;
 
     public:
         /// Everything found for \a iid, scanning the registered directories if they have not been
@@ -64,7 +65,7 @@ namespace stdc::plugin {
         /// Nothing is loaded. Loaders for plugins that could not be read are returned along with
         /// the rest, carrying the reason, so that a caller which finds no match can say whether
         /// the plugin it wanted is missing or merely broken.
-        std::vector<PluginLoader *> plugins(const char *iid) const;
+        std::vector<PluginLoader *> plugins(std::string_view iid) const;
 
     protected:
         class Impl;

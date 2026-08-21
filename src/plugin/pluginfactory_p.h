@@ -30,7 +30,7 @@ namespace stdc::plugin {
         ///
         /// Scanning only ever adds. A loader that exists may have been handed out and may have been
         /// loaded, so rescanning must not take it away.
-        void scanPlugins(const char *iid) const;
+        void scanPlugins(std::string_view iid) const;
 
         std::map<std::string, vlarray<std::filesystem::path>, std::less<>> pluginPaths;
 
