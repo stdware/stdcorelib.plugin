@@ -159,6 +159,9 @@ BOOST_AUTO_TEST_CASE(test_factory_scan_hooks) {
     BOOST_REQUIRE_EQUAL(plugins.size(), 1u);
     BOOST_CHECK_EQUAL(plugins.front()->filePath(), TEST_PLUGINLOADER_PLUGIN_PATH);
 
+    factory.addPluginPath("org.stdcorelib.LoaderTest", root);
+    BOOST_CHECK_EQUAL(factory.plugins("org.stdcorelib.LoaderTest").size(), 1u);
+
     TestPluginFactory mismatchedFactory;
     mismatchedFactory.addPluginPath("org.stdcorelib.Other", root);
     BOOST_CHECK(mismatchedFactory.plugins("org.stdcorelib.Other").empty());

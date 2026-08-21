@@ -10,6 +10,7 @@
 
 #include <stdcorelib/path.h>
 #include <stdcorelib/pimpl.h>
+#include <stdcorelib/stlextra/algorithms.h>
 
 namespace fs = std::filesystem;
 
@@ -55,17 +56,24 @@ namespace stdc::plugin {
                     continue;
                 }
 
+                std::error_code ec;
+                auto canonical = fs::canonical(pluginPath, ec);
+                if (ec) {
+                    scanSucceeded = false;
+                    continue;
+                }
+                auto pluginFile = canonical.native();
+                if (stdc::contains(readPluginFiles, pluginFile)) {
+                    continue;
+                }
+
                 auto loader = createLoader();
-                loader->setFilePath(pluginPath, metadataPath);
+                loader->setFilePath(canonical, metadataPath);
                 if (loader->iid() != iid) {
                     continue;
                 }
 
-                std::error_code ec;
-                auto canonical = fs::canonical(pluginPath, ec);
-                if (!ec && !readPluginFiles.insert(canonical.native()).second) {
-                    continue;
-                }
+                readPluginFiles.insert(std::move(pluginFile));
                 known.emplace_back(std::move(loader));
             }
         }
@@ -202,7 +210,7 @@ namespace stdc::plugin {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
-        if (impl.pluginsDirty.count(iid)) {
+        if (stdc::contains(impl.pluginsDirty, iid)) {
             impl.scanPlugins(*this, iid);
         }
 
