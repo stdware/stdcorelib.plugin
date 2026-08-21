@@ -23,7 +23,7 @@ namespace stdc::plugin {
 
     public:
         /// Builds an empty loader this factory owns.
-        static PluginLoader *createLoader();
+        static std::unique_ptr<PluginLoader> createLoader();
 
         /// Reads any manifest under the directories registered for \a iid that has not been read
         /// already.

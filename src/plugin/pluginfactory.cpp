@@ -24,8 +24,8 @@ namespace stdc::plugin {
 
     PluginFactory::Impl::~Impl() = default;
 
-    PluginLoader *PluginFactory::Impl::createLoader() {
-        return new PluginLoader();
+    std::unique_ptr<PluginLoader> PluginFactory::Impl::createLoader() {
+        return std::make_unique<PluginLoader>();
     }
 
     void PluginFactory::Impl::scanPlugins(const char *iid) const {
@@ -73,7 +73,7 @@ namespace stdc::plugin {
                         R"("%1" declares iid "%2", which is not the "%3" it was found under)",
                         canonical, loaderImpl.iid, iid));
                 }
-                known.emplace_back(loader);
+                known.emplace_back(std::move(loader));
             }
         }
 
@@ -107,7 +107,7 @@ namespace stdc::plugin {
             } else {
                 loaderImpl.iid = iid.toString();
             }
-            impl.loaders[loaderImpl.iid].emplace_back(loader);
+            impl.loaders[loaderImpl.iid].emplace_back(std::move(loader));
         }
     }
 
@@ -128,7 +128,7 @@ namespace stdc::plugin {
         } else {
             loaderImpl.iid = iid.toString();
         }
-        impl.loaders[loaderImpl.iid].emplace_back(loader);
+        impl.loaders[loaderImpl.iid].emplace_back(std::move(loader));
     }
 
     void PluginFactory::addPluginPath(const char *iid, const std::filesystem::path &path) {
