@@ -260,7 +260,6 @@ namespace stdc::pluginsystem {
             loaders = factory->plugins(iid);
         }
 
-        std::lock_guard<std::mutex> lock(specsMtx);
         for (auto loader : loaders) {
             pluginData.try_emplace(loader, *loader);
         }
@@ -296,7 +295,7 @@ namespace stdc::pluginsystem {
 
     void PluginSystem::setPluginPaths(array_view<std::filesystem::path> paths) {
         stdc_impl_t;
-        std::lock_guard<std::mutex> lock(impl.configMtx);
+        std::unique_lock<std::shared_mutex> lock(impl.configMtx);
         if (impl.loadStarted) {
             return;
         }
@@ -305,20 +304,26 @@ namespace stdc::pluginsystem {
 
     std::vector<std::filesystem::path> PluginSystem::pluginPaths() const {
         stdc_impl_t;
-        std::lock_guard<std::mutex> lock(impl.configMtx);
+        std::shared_lock<std::shared_mutex> lock(impl.configMtx);
         return impl.factory->pluginPaths(impl.iid);
     }
 
     std::vector<PluginSpec *> PluginSystem::plugins() const {
         stdc_impl_t;
-        std::lock_guard<std::mutex> lock(impl.configMtx);
+        std::shared_lock<std::shared_mutex> readLock(impl.configMtx);
+        if (impl.loadStarted) {
+            return impl.plugins(false);
+        }
+        readLock.unlock();
+
+        std::unique_lock<std::shared_mutex> writeLock(impl.configMtx);
         return impl.plugins(!impl.loadStarted);
     }
 
     void PluginSystem::loadPlugins() {
         stdc_impl_t;
         {
-            std::lock_guard<std::mutex> lock(impl.configMtx);
+            std::unique_lock<std::shared_mutex> lock(impl.configMtx);
             if (impl.loadStarted) {
                 return;
             }
@@ -377,13 +382,23 @@ namespace stdc::pluginsystem {
 
     bool PluginSystem::hasError() const {
         stdc_impl_t;
-        std::lock_guard<std::mutex> lock(impl.configMtx);
-        for (auto spec : impl.plugins(!impl.loadStarted)) {
-            if (spec->hasError()) {
-                return true;
+        const auto containsError = [](const std::vector<PluginSpec *> &specs) {
+            for (auto spec : specs) {
+                if (spec->hasError()) {
+                    return true;
+                }
             }
+            return false;
+        };
+
+        std::shared_lock<std::shared_mutex> readLock(impl.configMtx);
+        if (impl.loadStarted) {
+            return containsError(impl.plugins(false));
         }
-        return false;
+        readLock.unlock();
+
+        std::unique_lock<std::shared_mutex> writeLock(impl.configMtx);
+        return containsError(impl.plugins(!impl.loadStarted));
     }
 
 }

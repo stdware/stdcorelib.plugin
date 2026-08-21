@@ -4,8 +4,8 @@
 #define STDCORELIB_PLUGINSYSTEM_PLUGINSYSTEM_P_H
 
 #include <map>
-#include <mutex>
 #include <set>
+#include <shared_mutex>
 
 #include <stdcorelib/adt/linked_map.h>
 #include <stdcorelib/pimpl.h>
@@ -30,8 +30,8 @@ namespace stdc::pluginsystem {
         PluginLayout layout;
         std::unique_ptr<plugin::PluginFactory> factory;
         mutable linked_map<plugin::PluginLoader *, PluginSpecData> pluginData;
-        mutable std::mutex specsMtx;
-        mutable std::mutex configMtx;
+        /// Protects the path configuration, discovery cache, and transition to loadStarted.
+        mutable std::shared_mutex configMtx;
         bool loadStarted = false;
 
         std::map<PluginSpecData *, std::vector<ResolvedDependency>> resolvedDependencies;
@@ -40,6 +40,8 @@ namespace stdc::pluginsystem {
         void resolveDependencies();
         bool requiredDependenciesAtState(PluginSpecData *data, PluginSpec::State state,
                                          std::string *errorMessage) const;
+        /// The caller holds configMtx exclusively when \a scan is true, and at least shared when
+        /// it is false.
         std::vector<PluginSpec *> plugins(bool scan) const;
     };
 
