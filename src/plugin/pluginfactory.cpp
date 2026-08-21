@@ -115,20 +115,8 @@ namespace stdc::plugin {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
-        auto loader = Impl::createLoader();
-        auto &loaderImpl = *loader->_impl;
-        loaderImpl.origin = PluginLoader::Impl::Runtime;
-        loaderImpl.metadata = metadata;
-        loaderImpl.plugin = plugin;
-        loaderImpl.state = PluginLoader::Loaded;
-
-        auto iid = metadata["iid"];
-        if (!iid.isString() || iid.toString().empty()) {
-            loaderImpl.reportError("runtime plugin declares no iid");
-        } else {
-            loaderImpl.iid = iid.toString();
-        }
-        impl.loaders[loaderImpl.iid].emplace_back(std::move(loader));
+        auto loader = std::make_unique<PluginLoader>(plugin, metadata);
+        impl.loaders[loader->iid()].emplace_back(std::move(loader));
     }
 
     void PluginFactory::addPluginPath(const char *iid, const std::filesystem::path &path) {

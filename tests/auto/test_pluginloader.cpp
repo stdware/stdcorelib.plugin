@@ -4,6 +4,12 @@
 
 #include <boost/test/unit_test.hpp>
 
+namespace {
+
+    class RuntimePlugin : public stdc::plugin::Plugin {};
+
+}
+
 BOOST_AUTO_TEST_SUITE(test_pluginloader)
 
 BOOST_AUTO_TEST_CASE(test_null) {
@@ -40,6 +46,21 @@ BOOST_AUTO_TEST_CASE(test_set_file_path) {
     BOOST_CHECK_EQUAL(loader.filePath(), TEST_PLUGINLOADER_PLUGIN_PATH);
     BOOST_CHECK_EQUAL(loader.iid(), "org.stdcorelib.LoaderTest");
     BOOST_CHECK(!loader.plugin());
+}
+
+BOOST_AUTO_TEST_CASE(test_runtime_plugin) {
+    RuntimePlugin plugin;
+    const stdc::json::Value metadata = stdc::json::Object{
+        {"iid", "org.stdcorelib.RuntimeTest"},
+    };
+
+    stdc::plugin::PluginLoader loader(&plugin, metadata);
+
+    BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Loaded);
+    BOOST_CHECK(loader.isLoaded());
+    BOOST_CHECK_EQUAL(loader.plugin(), &plugin);
+    BOOST_CHECK_EQUAL(loader.iid(), "org.stdcorelib.RuntimeTest");
+    BOOST_CHECK(loader.filePath().empty());
 }
 
 BOOST_AUTO_TEST_CASE(test_load_failed) {

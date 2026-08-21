@@ -164,6 +164,26 @@ namespace stdc::plugin {
         return true;
     }
 
+    bool PluginLoader::Impl::setRuntimePlugin(Plugin *runtimePlugin,
+                                              const json::Value &runtimeMetadata) {
+        reset();
+        origin = Runtime;
+        metadata = runtimeMetadata;
+
+        auto runtimeIid = metadata["iid"];
+        if (!runtimeIid.isString() || runtimeIid.toString().empty()) {
+            return reportError("runtime plugin declares no iid");
+        }
+        if (!runtimePlugin) {
+            return reportError("runtime plugin instance is null");
+        }
+
+        iid = runtimeIid.toString();
+        plugin = runtimePlugin;
+        state = PluginLoader::Loaded;
+        return true;
+    }
+
     bool PluginLoader::Impl::loadLibrary() {
         if (hasError) {
             return false;
@@ -226,8 +246,14 @@ namespace stdc::plugin {
     PluginLoader::PluginLoader() : _impl(new Impl()) {
     }
 
-    PluginLoader::PluginLoader(const std::filesystem::path &filePath) : PluginLoader() {
-        _impl->readLibrary(filePath);
+    PluginLoader::PluginLoader(const std::filesystem::path &filePath,
+                               const std::optional<std::filesystem::path> &metadataPath)
+        : PluginLoader() {
+        _impl->readLibrary(filePath, metadataPath);
+    }
+
+    PluginLoader::PluginLoader(Plugin *plugin, const json::Value &metadata) : PluginLoader() {
+        _impl->setRuntimePlugin(plugin, metadata);
     }
 
     PluginLoader::~PluginLoader() = default;
@@ -240,6 +266,11 @@ namespace stdc::plugin {
                                    const std::optional<std::filesystem::path> &metadataPath) {
         stdc_impl_t;
         impl.readLibrary(filePath, metadataPath);
+    }
+
+    void PluginLoader::setPlugin(Plugin *plugin, const json::Value &metadata) {
+        stdc_impl_t;
+        impl.setRuntimePlugin(plugin, metadata);
     }
 
     PluginLoader::State PluginLoader::state() const {
@@ -303,10 +334,10 @@ namespace stdc::plugin {
         return pluginSets;
     }
 
-    std::vector<StaticPlugin> PluginLoader::staticPlugins(const char *pluginSet) {
+    std::vector<StaticPlugin> PluginLoader::staticPlugins(std::string_view iid) {
         std::vector<StaticPlugin> plugins;
         for (const auto &entry : StaticPluginRegistry::entries()) {
-            if (entry.name() == pluginSet) {
+            if (entry.name() == iid) {
                 plugins.push_back(entry.instantiate());
             }
         }

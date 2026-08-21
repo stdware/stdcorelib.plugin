@@ -12,8 +12,6 @@
 #include <stdcorelib/stdc_global.h>
 #include <stdcorelib/support/json.h>
 
-#include <stdcorelib/stdc_plugin_global.h>
-
 #include <stdcorelib/plugin/plugin.h>
 
 namespace stdc::plugin {
@@ -36,7 +34,9 @@ namespace stdc::plugin {
     class STDC_PLUGIN_EXPORT PluginLoader {
     public:
         PluginLoader();
-        explicit PluginLoader(const std::filesystem::path &filePath);
+        explicit PluginLoader(const std::filesystem::path &filePath,
+                              const std::optional<std::filesystem::path> &metadataPath = {});
+        PluginLoader(Plugin *plugin, const json::Value &metadata);
         ~PluginLoader();
 
         PluginLoader(PluginLoader &&RHS) noexcept;
@@ -65,6 +65,12 @@ namespace stdc::plugin {
         ///                     in the plugin library.
         void setFilePath(const std::filesystem::path &filePath,
                          const std::optional<std::filesystem::path> &metadataPath = {});
+
+        /// Selects a plugin instance that the program already owns.
+        ///
+        /// \param plugin The live plugin instance. Ownership stays with the caller.
+        /// \param metadata The plugin metadata, including its \c iid.
+        void setPlugin(Plugin *plugin, const json::Value &metadata);
 
         State state() const;
         bool hasError() const;
@@ -104,7 +110,7 @@ namespace stdc::plugin {
 
     public:
         static std::vector<std::string> staticPluginSets();
-        static std::vector<StaticPlugin> staticPlugins(const char *pluginSet);
+        static std::vector<StaticPlugin> staticPlugins(std::string_view iid);
 
     protected:
         class Impl;
