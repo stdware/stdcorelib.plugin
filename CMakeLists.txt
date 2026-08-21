@@ -68,7 +68,10 @@ find_package(stdcorelib REQUIRED)
 # ----------------------------------
 include(cmake/AddPluginMetadata.cmake)
 
-file(GLOB _src src/plugin/*.cpp)
+file(GLOB _src
+    src/plugin/*.cpp
+    src/pluginsystem/*.cpp
+)
 list(FILTER _src EXCLUDE REGEX "pluginloader_(win|linux|mac)\\.cpp$")
 
 if(WIN32)
@@ -113,8 +116,10 @@ target_include_directories(${PROJECT_NAME} INTERFACE
 target_include_directories(${PROJECT_NAME} PRIVATE
     src
     src/plugin
+    src/pluginsystem
     include
     include/stdcorelib/plugin
+    include/stdcorelib/pluginsystem
 )
 
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)

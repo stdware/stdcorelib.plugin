@@ -1,0 +1,9 @@
+{
+    "$version": "1.0",
+    "iid": "org.stdcorelib.PluginSystem",
+    "metadata": {
+        "id": "org.stdcorelib.PluginSystemTest",
+        "name": "PluginSystem Test",
+        "version": "2.1.0"
+    }
+}
