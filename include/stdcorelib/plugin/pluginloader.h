@@ -12,7 +12,7 @@
 
 #include <stdcorelib/stdc_plugin_global.h>
 
-namespace stdc {
+namespace stdc::plugin {
 
     /// \addtogroup plugin
     /// @{

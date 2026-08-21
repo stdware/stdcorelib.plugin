@@ -13,7 +13,7 @@
 
 namespace fs = std::filesystem;
 
-namespace stdc {
+namespace stdc::plugin {
 
     /// The manifest format this build understands.
     ///

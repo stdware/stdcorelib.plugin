@@ -8,7 +8,7 @@
 #include <stdcorelib/plugin/plugin.h>
 #include <stdcorelib/plugin/pluginloader.h>
 
-namespace stdc {
+namespace stdc::plugin {
 
     class PluginLoader::Impl {
     public:

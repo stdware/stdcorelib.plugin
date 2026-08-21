@@ -11,7 +11,7 @@
 
 #include <stdcorelib/plugin/pluginfactory.h>
 
-namespace stdc {
+namespace stdc::plugin {
 
     class STDC_PLUGIN_EXPORT PluginFactory::Impl {
     public:

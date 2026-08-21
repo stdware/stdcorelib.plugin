@@ -13,9 +13,9 @@
 
 namespace fs = std::filesystem;
 
-STDC_INSTANTIATE_STATIC_REGISTRY_EXPORT(stdc::StaticPlugin, STDC_PLUGIN_EXPORT)
+STDC_INSTANTIATE_STATIC_REGISTRY_EXPORT(stdc::plugin::StaticPlugin, STDC_PLUGIN_EXPORT)
 
-namespace stdc {
+namespace stdc::plugin {
 
     /// The file that says what a plugin is. One per plugin directory.
     static constexpr const char *manifestName = "plugin.json";
