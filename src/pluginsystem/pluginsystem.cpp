@@ -93,7 +93,8 @@ namespace stdc::pluginsystem {
         loadOrder.clear();
 
         std::map<std::string, std::vector<PluginSpecData *>, std::less<>> dataById;
-        for (auto &data : pluginData) {
+        for (auto &item : pluginData) {
+            auto &data = item.second;
             if (!data.id.empty()) {
                 dataById[data.id].push_back(&data);
             }
@@ -108,7 +109,8 @@ namespace stdc::pluginsystem {
             }
         }
 
-        for (auto &data : pluginData) {
+        for (auto &item : pluginData) {
+            auto &data = item.second;
             if (data.state != PluginSpec::Read) {
                 continue;
             }
@@ -179,7 +181,8 @@ namespace stdc::pluginsystem {
             colors[data] = 2;
         };
 
-        for (auto &data : pluginData) {
+        for (auto &item : pluginData) {
+            auto &data = item.second;
             if (data.state == PluginSpec::Resolved && colors[&data] == 0) {
                 findCycles(&data);
             }
@@ -191,7 +194,8 @@ namespace stdc::pluginsystem {
         bool changed;
         do {
             changed = false;
-            for (auto &data : pluginData) {
+            for (auto &item : pluginData) {
+                auto &data = item.second;
                 if (data.state != PluginSpec::Resolved) {
                     continue;
                 }
@@ -218,7 +222,8 @@ namespace stdc::pluginsystem {
             added.insert(data);
             loadOrder.push_back(data);
         };
-        for (auto &data : pluginData) {
+        for (auto &item : pluginData) {
+            auto &data = item.second;
             append(&data);
         }
     }
@@ -251,16 +256,13 @@ namespace stdc::pluginsystem {
 
         std::lock_guard<std::mutex> lock(specsMtx);
         for (auto loader : loaders) {
-            if (stdc::contains(dataByLoader, loader)) {
-                continue;
-            }
-            pluginData.emplace_back(*loader);
-            dataByLoader.emplace(loader, &pluginData.back());
+            pluginData.try_emplace(loader, *loader);
         }
 
         std::vector<PluginSpec *> result;
         result.reserve(pluginData.size());
-        for (auto &data : pluginData) {
+        for (auto &item : pluginData) {
+            auto &data = item.second;
             result.push_back(&data.spec);
         }
         return result;

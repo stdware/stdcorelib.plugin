@@ -3,11 +3,11 @@
 #ifndef STDCORELIB_PLUGINSYSTEM_PLUGINSYSTEM_P_H
 #define STDCORELIB_PLUGINSYSTEM_PLUGINSYSTEM_P_H
 
-#include <deque>
 #include <map>
 #include <mutex>
 #include <set>
 
+#include <stdcorelib/adt/linked_map.h>
 #include <stdcorelib/pimpl.h>
 
 #include <stdcorelib/plugin/pluginfactory.h>
@@ -29,8 +29,7 @@ namespace stdc::pluginsystem {
         std::string iid;
         PluginLayout layout;
         std::unique_ptr<plugin::PluginFactory> factory;
-        mutable std::deque<PluginSpecData> pluginData;
-        mutable std::map<plugin::PluginLoader *, PluginSpecData *> dataByLoader;
+        mutable linked_map<plugin::PluginLoader *, PluginSpecData> pluginData;
         mutable std::mutex specsMtx;
         mutable std::mutex configMtx;
         bool loadStarted = false;
