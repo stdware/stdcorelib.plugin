@@ -1,0 +1,217 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  # The plugin library is checked in every link shape on each platform. stdcorelib is built and
+  # installed first because this repository intentionally consumes its installed CMake package.
+  build:
+    name: ${{ matrix.platform }} ${{ matrix.config }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ linux-gcc, linux-clang, macos, windows-msvc, windows-clang-cl ]
+        config: [ shared, static, release ]
+        include:
+          - platform: linux-gcc
+            os: ubuntu-latest
+            cxx: g++
+          - platform: linux-clang
+            os: ubuntu-latest
+            cxx: clang++
+          - platform: macos
+            os: macos-latest
+            cxx: clang++
+          - platform: windows-msvc
+            os: windows-latest
+            cxx: cl
+          - platform: windows-clang-cl
+            os: windows-latest
+            cxx: clang-cl
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The plugin currently depends on changes developed on stdcorelib's dev branch. Promote
+      # both repositories together when those changes land on main.
+      - name: Check out stdcorelib
+        uses: actions/checkout@v4
+        with:
+          repository: stdware/stdcorelib
+          ref: dev
+          path: _deps/stdcorelib
+
+      - uses: ./.github/actions/setup
+
+      - name: Settings for this configuration
+        id: cfg
+        shell: bash
+        run: |
+          case "${{ matrix.config }}" in
+            shared)  flags="-DSTDC_PLUGIN_BUILD_SHARED=ON"; type=Debug   ;;
+            static)  flags="-DSTDC_PLUGIN_BUILD_STATIC=ON"; type=Debug   ;;
+            release) flags="-DSTDC_PLUGIN_BUILD_SHARED=ON"; type=Release ;;
+          esac
+          echo "flags=$flags" >> "$GITHUB_OUTPUT"
+          echo "type=$type" >> "$GITHUB_OUTPUT"
+
+      - name: Build and install stdcorelib
+        shell: bash
+        env:
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake -G Ninja -S _deps/stdcorelib -B _deps/stdcorelib-build \
+            -DCMAKE_BUILD_TYPE=${{ steps.cfg.outputs.type }} \
+            -DSTDC_BUILD_SHARED=ON \
+            -DSTDC_INSTALL=ON \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/stdcorelib"
+          cmake --build _deps/stdcorelib-build
+          cmake --install _deps/stdcorelib-build
+
+      - name: Configure
+        shell: bash
+        env:
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake -G Ninja -S . -B build \
+            -DCMAKE_BUILD_TYPE=${{ steps.cfg.outputs.type }} \
+            -Dstdcorelib_DIR="$RUNNER_TEMP/stdcorelib/lib/cmake/stdcorelib" \
+            -DSTDC_PLUGIN_BUILD_TESTS=ON \
+            ${{ steps.cfg.outputs.flags }}
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --no-tests=error
+
+      - name: Install
+        run: cmake --install build --prefix "${{ runner.temp }}/stdcorelib-plugin"
+
+  # The compiler flag is private to each library target, so tests remain ordinary consumers of
+  # two libraries built without exception support. clang-cl stays in the matrix because it
+  # rejects throw expressions under /EHs-c-, unlike cl, which accepts them but disables unwind.
+  no-exceptions:
+    name: ${{ matrix.platform }} no-exceptions
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ linux-gcc, macos, windows-msvc, windows-clang-cl ]
+        include:
+          - platform: linux-gcc
+            os: ubuntu-latest
+            cxx: g++
+          - platform: macos
+            os: macos-latest
+            cxx: clang++
+          - platform: windows-msvc
+            os: windows-latest
+            cxx: cl
+          - platform: windows-clang-cl
+            os: windows-latest
+            cxx: clang-cl
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out stdcorelib
+        uses: actions/checkout@v4
+        with:
+          repository: stdware/stdcorelib
+          ref: dev
+          path: _deps/stdcorelib
+      - uses: ./.github/actions/setup
+
+      - name: Build and install stdcorelib without exceptions
+        shell: bash
+        env:
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake -G Ninja -S _deps/stdcorelib -B _deps/stdcorelib-build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DSTDC_BUILD_SHARED=ON \
+            -DSTDC_ENABLE_EXCEPTIONS=OFF \
+            -DSTDC_INSTALL=ON \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/stdcorelib"
+          cmake --build _deps/stdcorelib-build
+          cmake --install _deps/stdcorelib-build
+
+      - name: Configure
+        shell: bash
+        env:
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake -G Ninja -S . -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -Dstdcorelib_DIR="$RUNNER_TEMP/stdcorelib/lib/cmake/stdcorelib" \
+            -DSTDC_PLUGIN_BUILD_SHARED=ON \
+            -DSTDC_PLUGIN_BUILD_TESTS=ON \
+            -DSTDC_PLUGIN_ENABLE_EXCEPTIONS=OFF
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --no-tests=error
+
+  # The Windows implementation against the GNU Windows headers and linker. This is separate
+  # from clang-cl: both emit PE files, but expose different compatibility edges.
+  mingw:
+    name: windows-mingw ${{ matrix.config }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [ shared, static ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out stdcorelib
+        uses: actions/checkout@v4
+        with:
+          repository: stdware/stdcorelib
+          ref: dev
+          path: _deps/stdcorelib
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-boost
+
+      - name: Build and install stdcorelib
+        shell: msys2 {0}
+        run: |
+          cmake -G Ninja -S _deps/stdcorelib -B _deps/stdcorelib-build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DSTDC_BUILD_SHARED=ON \
+            -DSTDC_INSTALL=ON \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/stdcorelib"
+          cmake --build _deps/stdcorelib-build
+          cmake --install _deps/stdcorelib-build
+
+      - name: Build
+        shell: msys2 {0}
+        run: |
+          case "${{ matrix.config }}" in
+            shared) flags="-DSTDC_PLUGIN_BUILD_SHARED=ON" ;;
+            static) flags="-DSTDC_PLUGIN_BUILD_STATIC=ON" ;;
+          esac
+          cmake -G Ninja -S . -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -Dstdcorelib_DIR="$RUNNER_TEMP/stdcorelib/lib/cmake/stdcorelib" \
+            -DSTDC_PLUGIN_BUILD_TESTS=ON \
+            $flags
+          cmake --build build
+
+      - name: Test
+        shell: msys2 {0}
+        run: ctest --test-dir build --output-on-failure --no-tests=error

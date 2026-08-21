@@ -1,0 +1,62 @@
+name: Set up the build
+description: Ninja, Boost.Test and the compiler environment.
+
+runs:
+  using: composite
+  steps:
+    - name: Ninja and Boost.Test (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build libboost-test-dev
+
+    - name: Ninja and Boost.Test (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: brew install ninja boost
+
+    # Use the vcpkg executable on PATH consistently before and after vcvars changes the
+    # environment. Cache archives rather than installed/, so an incomplete install cannot be
+    # replayed as if it were complete.
+    - name: Ninja and vcpkg (Windows)
+      id: vcpkg
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        choco install ninja -y --no-progress
+        root=$(cygpath -m "$(dirname "$(command -v vcpkg)")")
+        echo "vcpkg root: $root"
+        echo "STDC_PLUGIN_VCPKG_ROOT=$root" >> "$GITHUB_ENV"
+        echo "VCPKG_DEFAULT_BINARY_CACHE=$RUNNER_TEMP\vcpkg-archives" >> "$GITHUB_ENV"
+        mkdir -p "$RUNNER_TEMP/vcpkg-archives"
+        echo "rev=$(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo unknown)" \
+          >> "$GITHUB_OUTPUT"
+
+    - name: Cache vcpkg binaries (Windows)
+      if: runner.os == 'Windows'
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg-archives
+        key: stdcorelib-plugin-boost-test-x64-windows-${{ steps.vcpkg.outputs.rev }}
+        restore-keys: stdcorelib-plugin-boost-test-x64-windows-
+
+    - name: Boost.Test (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      run: vcpkg install boost-test:x64-windows
+
+    - uses: ilammy/msvc-dev-cmd@v1
+      if: runner.os == 'Windows'
+      with:
+        arch: x64
+
+    - name: Point CMake at vcpkg (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        echo "CMAKE_TOOLCHAIN_FILE=$STDC_PLUGIN_VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+          >> "$GITHUB_ENV"
+        echo "VCPKG_TARGET_TRIPLET=x64-windows" >> "$GITHUB_ENV"
+        echo "CMAKE_PREFIX_PATH=$STDC_PLUGIN_VCPKG_ROOT/installed/x64-windows" \
+          >> "$GITHUB_ENV"
