@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: MIT
 
 #include "pluginsystem.h"
+#include "pluginsystem_p.h"
 
+#include <algorithm>
 #include <fstream>
+#include <functional>
 #include <map>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <utility>
 
@@ -19,7 +23,6 @@ namespace stdc::pluginsystem {
 
     namespace {
 
-        constexpr std::string_view pluginSystemIID = "org.stdcorelib.PluginSystem";
         constexpr const char *manifestName = "plugin.json";
 
         class DirectoryPluginFactory final : public plugin::PluginFactory {
@@ -76,25 +79,195 @@ namespace stdc::pluginsystem {
 
     }
 
-    class PluginSystem::Impl {
-    public:
-        explicit Impl(PluginLayout pluginLayout)
-            : layout(pluginLayout == Directory ? Directory : Flat) {
-            if (layout == Directory) {
-                factory = std::make_unique<DirectoryPluginFactory>();
-            } else {
-                factory = std::make_unique<plugin::PluginFactory>();
+    PluginSystem::Impl::Impl(std::string pluginIID, PluginLayout pluginLayout)
+        : iid(std::move(pluginIID)), layout(pluginLayout == Directory ? Directory : Flat) {
+        if (layout == Directory) {
+            factory = std::make_unique<DirectoryPluginFactory>();
+        } else {
+            factory = std::make_unique<plugin::PluginFactory>();
+        }
+    }
+
+    void PluginSystem::Impl::resolveDependencies() {
+        resolvedDependencies.clear();
+        loadOrder.clear();
+
+        std::map<std::string, std::vector<PluginSpecData *>, std::less<>> dataById;
+        for (auto &data : pluginData) {
+            if (!data.id.empty()) {
+                dataById[data.id].push_back(&data);
             }
         }
 
-        PluginLayout layout;
-        std::unique_ptr<plugin::PluginFactory> factory;
-        mutable std::vector<std::unique_ptr<PluginSpec>> specs;
-        mutable std::map<plugin::PluginLoader *, PluginSpec *> specsByLoader;
-        mutable std::mutex specs_mtx;
-    };
+        for (const auto &[id, matchingData] : dataById) {
+            if (matchingData.size() < 2) {
+                continue;
+            }
+            for (auto data : matchingData) {
+                data->reportError("duplicate plugin id \"" + id + "\"");
+            }
+        }
 
-    PluginSystem::PluginSystem(PluginLayout layout) : _impl(std::make_unique<Impl>(layout)) {
+        for (auto &data : pluginData) {
+            if (data.state != PluginSpec::Read) {
+                continue;
+            }
+
+            auto &resolved = resolvedDependencies[&data];
+            for (const auto &dependency : data.dependencies) {
+                auto it = dataById.find(dependency.id());
+                PluginSpecData *candidate =
+                    it != dataById.end() && it->second.size() == 1 ? it->second.front() : nullptr;
+                if (!candidate || candidate->state == PluginSpec::Invalid) {
+                    if (dependency.type() == PluginDependency::Required) {
+                        data.reportError("could not resolve required dependency \"" +
+                                         dependency.id() + "\"");
+                        break;
+                    }
+                    continue;
+                }
+
+                if (!(candidate->compatVersion <= dependency.version() &&
+                      dependency.version() <= candidate->version)) {
+                    if (dependency.type() == PluginDependency::Required) {
+                        data.reportError("incompatible required dependency \"" + dependency.id() +
+                                         "\"");
+                        break;
+                    }
+                    continue;
+                }
+                resolved.push_back({dependency.type(), candidate});
+            }
+            if (data.state == PluginSpec::Read) {
+                data.state = PluginSpec::Resolved;
+            }
+        }
+
+        std::map<PluginSpecData *, int> colors;
+        std::vector<PluginSpecData *> stack;
+        std::map<PluginSpecData *, std::string> cycleErrors;
+        std::function<void(PluginSpecData *)> findCycles = [&](PluginSpecData *data) {
+            colors[data] = 1;
+            stack.push_back(data);
+            for (const auto &dependency : resolvedDependencies[data]) {
+                auto next = dependency.data;
+                if (next->state != PluginSpec::Resolved) {
+                    continue;
+                }
+                if (colors[next] == 0) {
+                    findCycles(next);
+                    continue;
+                }
+                if (colors[next] != 1) {
+                    continue;
+                }
+
+                auto first = std::find(stack.begin(), stack.end(), next);
+                std::string path = "circular dependency: ";
+                for (auto it = first; it != stack.end(); ++it) {
+                    if (it != first) {
+                        path += " -> ";
+                    }
+                    path += (*it)->id;
+                }
+                path += " -> " + next->id;
+                for (auto it = first; it != stack.end(); ++it) {
+                    cycleErrors[*it] = path;
+                }
+            }
+            stack.pop_back();
+            colors[data] = 2;
+        };
+
+        for (auto &data : pluginData) {
+            if (data.state == PluginSpec::Resolved && colors[&data] == 0) {
+                findCycles(&data);
+            }
+        }
+        for (auto &[data, message] : cycleErrors) {
+            data->reportError(std::move(message));
+        }
+
+        bool changed;
+        do {
+            changed = false;
+            for (auto &data : pluginData) {
+                if (data.state != PluginSpec::Resolved) {
+                    continue;
+                }
+                for (const auto &dependency : resolvedDependencies[&data]) {
+                    if (dependency.type == PluginDependency::Required &&
+                        dependency.data->state != PluginSpec::Resolved) {
+                        data.reportError("required dependency \"" + dependency.data->id +
+                                         "\" is invalid");
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+        } while (changed);
+
+        std::set<PluginSpecData *> added;
+        std::function<void(PluginSpecData *)> append = [&](PluginSpecData *data) {
+            if (stdc::contains(added, data) || data->state != PluginSpec::Resolved) {
+                return;
+            }
+            for (const auto &dependency : resolvedDependencies[data]) {
+                append(dependency.data);
+            }
+            added.insert(data);
+            loadOrder.push_back(data);
+        };
+        for (auto &data : pluginData) {
+            append(&data);
+        }
+    }
+
+    bool PluginSystem::Impl::requiredDependenciesAtState(PluginSpecData *data,
+                                                         PluginSpec::State state,
+                                                         std::string *errorMessage) const {
+        auto it = resolvedDependencies.find(data);
+        if (it == resolvedDependencies.end()) {
+            return true;
+        }
+        for (const auto &dependency : it->second) {
+            if (dependency.type != PluginDependency::Required) {
+                continue;
+            }
+            if (dependency.data->state != state) {
+                *errorMessage = "required dependency \"" + dependency.data->id +
+                                "\" did not reach the required state";
+                return false;
+            }
+        }
+        return true;
+    }
+
+    std::vector<PluginSpec *> PluginSystem::Impl::plugins(bool scan) const {
+        std::vector<plugin::PluginLoader *> loaders;
+        if (scan) {
+            loaders = factory->plugins(iid);
+        }
+
+        std::lock_guard<std::mutex> lock(specsMtx);
+        for (auto loader : loaders) {
+            if (stdc::contains(dataByLoader, loader)) {
+                continue;
+            }
+            pluginData.emplace_back(*loader);
+            dataByLoader.emplace(loader, &pluginData.back());
+        }
+
+        std::vector<PluginSpec *> result;
+        result.reserve(pluginData.size());
+        for (auto &data : pluginData) {
+            result.push_back(&data.spec);
+        }
+        return result;
+    }
+
+    PluginSystem::PluginSystem(std::string_view iid, PluginLayout layout)
+        : _impl(std::make_unique<Impl>(std::string(iid), layout)) {
     }
 
     PluginSystem::~PluginSystem() = default;
@@ -103,53 +276,106 @@ namespace stdc::pluginsystem {
 
     PluginSystem &PluginSystem::operator=(PluginSystem &&RHS) noexcept = default;
 
-    PluginSystem::PluginLayout PluginSystem::pluginLayout() const {
-        return _impl->layout;
+    const std::string &PluginSystem::iid() const {
+        stdc_impl_t;
+        return impl.iid;
     }
 
-    void PluginSystem::addPluginPath(const std::filesystem::path &path) {
-        _impl->factory->addPluginPath(pluginSystemIID, path);
+    PluginSystem::PluginLayout PluginSystem::pluginLayout() const {
+        stdc_impl_t;
+        return impl.layout;
     }
 
     void PluginSystem::setPluginPaths(array_view<std::filesystem::path> paths) {
-        _impl->factory->setPluginPaths(pluginSystemIID, paths);
+        stdc_impl_t;
+        std::lock_guard<std::mutex> lock(impl.configMtx);
+        if (impl.loadStarted) {
+            return;
+        }
+        impl.factory->setPluginPaths(impl.iid, paths);
     }
 
     std::vector<std::filesystem::path> PluginSystem::pluginPaths() const {
-        return _impl->factory->pluginPaths(pluginSystemIID);
-    }
-
-    void PluginSystem::addStaticPlugins() {
-        _impl->factory->addStaticPlugins(pluginSystemIID);
-    }
-
-    void PluginSystem::addRuntimePlugin(IPlugin *plugin, const json::Value &metadata) {
-        _impl->factory->addRuntimePlugin(plugin, metadata);
+        stdc_impl_t;
+        std::lock_guard<std::mutex> lock(impl.configMtx);
+        return impl.factory->pluginPaths(impl.iid);
     }
 
     std::vector<PluginSpec *> PluginSystem::plugins() const {
-        auto loaders = _impl->factory->plugins(pluginSystemIID);
-
-        std::lock_guard<std::mutex> lock(_impl->specs_mtx);
-        for (auto *loader : loaders) {
-            if (stdc::contains(_impl->specsByLoader, loader)) {
-                continue;
-            }
-            auto spec = std::make_unique<PluginSpec>(*loader);
-            _impl->specsByLoader.emplace(loader, spec.get());
-            _impl->specs.emplace_back(std::move(spec));
-        }
-
-        std::vector<PluginSpec *> result;
-        result.reserve(_impl->specs.size());
-        for (const auto &spec : _impl->specs) {
-            result.push_back(spec.get());
-        }
-        return result;
+        stdc_impl_t;
+        std::lock_guard<std::mutex> lock(impl.configMtx);
+        return impl.plugins(!impl.loadStarted);
     }
 
-    std::string_view PluginSystem::pluginIID() {
-        return pluginSystemIID;
+    void PluginSystem::loadPlugins() {
+        stdc_impl_t;
+        {
+            std::lock_guard<std::mutex> lock(impl.configMtx);
+            if (impl.loadStarted) {
+                return;
+            }
+            impl.plugins(true);
+            impl.loadStarted = true;
+        }
+
+        impl.resolveDependencies();
+
+        for (auto data : impl.loadOrder) {
+            std::string errorMessage;
+            if (!impl.requiredDependenciesAtState(data, PluginSpec::Loaded, &errorMessage)) {
+                data->reportError(std::move(errorMessage), data->state);
+                continue;
+            }
+            if (!data->loader->load()) {
+                data->reportError(data->loader->errorMessage(), data->state);
+                continue;
+            }
+            data->plugin = dynamic_cast<IPlugin *>(data->loader->plugin());
+            if (!data->plugin) {
+                data->reportError("loaded plugin does not implement IPlugin", data->state);
+                continue;
+            }
+            data->state = PluginSpec::Loaded;
+        }
+
+        for (auto data : impl.loadOrder) {
+            if (data->state != PluginSpec::Loaded || data->spec.hasError()) {
+                continue;
+            }
+            std::string errorMessage;
+            if (!impl.requiredDependenciesAtState(data, PluginSpec::Initialized, &errorMessage)) {
+                data->reportError(std::move(errorMessage), data->state);
+                continue;
+            }
+            if (!data->plugin->initialize(&errorMessage)) {
+                if (errorMessage.empty()) {
+                    errorMessage = "plugin initialization failed";
+                }
+                data->reportError(std::move(errorMessage), data->state);
+                continue;
+            }
+            data->state = PluginSpec::Initialized;
+        }
+
+        for (auto it = impl.loadOrder.rbegin(); it != impl.loadOrder.rend(); ++it) {
+            auto data = *it;
+            if (data->state != PluginSpec::Initialized || data->spec.hasError()) {
+                continue;
+            }
+            data->plugin->pluginInitialized();
+            data->state = PluginSpec::Running;
+        }
+    }
+
+    bool PluginSystem::hasError() const {
+        stdc_impl_t;
+        std::lock_guard<std::mutex> lock(impl.configMtx);
+        for (auto spec : impl.plugins(!impl.loadStarted)) {
+            if (spec->hasError()) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }

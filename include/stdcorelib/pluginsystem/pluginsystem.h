@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -26,31 +27,36 @@ namespace stdc::pluginsystem {
             Directory,
         };
 
-        explicit PluginSystem(PluginLayout layout = Flat);
+        /// Creates a system that accepts only \a iid.
+        ///
+        /// \pre \a iid is not empty.
+        explicit PluginSystem(std::string_view iid, PluginLayout layout = Flat);
         ~PluginSystem();
 
         PluginSystem(PluginSystem &&RHS) noexcept;
         PluginSystem &operator=(PluginSystem &&RHS) noexcept;
 
     public:
+        /// Returns the IID this system discovers plugins for.
+        const std::string &iid() const;
+
+        /// Returns the layout of the plugins this system discovers.
         PluginLayout pluginLayout() const;
 
-        /// Adds a filesystem search path. Set every path before first calling plugins().
-        void addPluginPath(const std::filesystem::path &path);
+        /// Replaces the filesystem search paths before loadPlugins() starts.
+        ///
+        /// Calls after loadPlugins() starts have no effect.
         void setPluginPaths(array_view<std::filesystem::path> paths);
         std::vector<std::filesystem::path> pluginPaths() const;
-
-        /// Adds every static PluginSystem plugin registered under the fixed PluginSystem IID.
-        void addStaticPlugins();
-
-        /// Adds a live PluginSystem plugin. Ownership remains with the caller.
-        void addRuntimePlugin(IPlugin *plugin, const json::Value &metadata);
 
         /// Returns every discovered spec, preserving each pointer for this system's lifetime.
         std::vector<PluginSpec *> plugins() const;
 
-        /// The one IID accepted by this system.
-        static std::string_view pluginIID();
+        /// Loads and initializes every valid plugin once. Errors remain on each PluginSpec.
+        void loadPlugins();
+
+        /// Whether any plugin has an error.
+        bool hasError() const;
 
     protected:
         class Impl;

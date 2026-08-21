@@ -7,11 +7,12 @@
 
 namespace stdc::pluginsystem {
 
-    PluginSpec::Impl::Impl(plugin::PluginLoader &pluginLoader) : loader(&pluginLoader) {
+    PluginSpecData::PluginSpecData(plugin::PluginLoader &pluginLoader)
+        : spec(this), loader(&pluginLoader) {
         read();
     }
 
-    bool PluginSpec::Impl::read() {
+    bool PluginSpecData::read() {
         if (loader->hasError()) {
             return reportError(loader->errorMessage());
         }
@@ -59,56 +60,100 @@ namespace stdc::pluginsystem {
         } else {
             return reportError("invalid plugin compatibility version");
         }
+        if (compatVersion > version) {
+            return reportError("plugin compatibility version is newer than its version");
+        }
 
-        state = Read;
+        const auto &dependencyValues = metadata["dependencies"];
+        if (!dependencyValues.isNull()) {
+            if (!dependencyValues.isArray()) {
+                return reportError("invalid plugin dependencies");
+            }
+            for (const auto &value : dependencyValues.toArray()) {
+                if (!value.isObject()) {
+                    return reportError("invalid plugin dependency");
+                }
+
+                std::string dependencyId;
+                const auto &idValue = value["id"];
+                if (!idValue.isString() || idValue.toString().empty()) {
+                    return reportError("missing or invalid dependency id");
+                }
+                dependencyId = idValue.toString();
+
+                const auto &versionValue = value["version"];
+                if (!versionValue.isString() || versionValue.toString().empty()) {
+                    return reportError("missing or invalid dependency version");
+                }
+                auto dependencyVersion = VersionNumber::fromString(versionValue.toString());
+                if (!dependencyVersion) {
+                    return reportError("invalid dependency version");
+                }
+
+                const auto &typeValue = value["type"];
+                if (!typeValue.isString()) {
+                    return reportError("missing or invalid dependency type");
+                }
+                PluginDependency::Type type;
+                if (typeValue.toString() == "required") {
+                    type = PluginDependency::Required;
+                } else if (typeValue.toString() == "optional") {
+                    type = PluginDependency::Optional;
+                } else {
+                    return reportError("invalid dependency type");
+                }
+
+                dependencies.emplace_back(std::move(dependencyId), *dependencyVersion, type);
+            }
+        }
+
+        state = PluginSpec::Read;
         return true;
     }
 
-    bool PluginSpec::Impl::reportError(std::string message) {
-        state = Invalid;
+    bool PluginSpecData::reportError(std::string message, PluginSpec::State errorState) {
+        state = errorState;
         errorMessage = std::move(message);
         return false;
     }
 
-    PluginSpec::PluginSpec(plugin::PluginLoader &loader) : _impl(std::make_unique<Impl>(loader)) {
+    PluginSpec::PluginSpec(PluginSpecData *data) : _data(data) {
     }
 
-    PluginSpec::~PluginSpec() = default;
-
-    PluginSpec::PluginSpec(PluginSpec &&RHS) noexcept = default;
-
-    PluginSpec &PluginSpec::operator=(PluginSpec &&RHS) noexcept = default;
-
     PluginSpec::State PluginSpec::state() const {
-        return _impl->state;
+        return _data->state;
     }
 
     bool PluginSpec::hasError() const {
-        return !_impl->errorMessage.empty();
+        return !_data->errorMessage.empty();
     }
 
     const std::string &PluginSpec::errorMessage() const {
-        return _impl->errorMessage;
+        return _data->errorMessage;
     }
 
     const std::string &PluginSpec::id() const {
-        return _impl->id;
+        return _data->id;
     }
 
     const std::string &PluginSpec::name() const {
-        return _impl->name;
+        return _data->name;
     }
 
     const VersionNumber &PluginSpec::version() const {
-        return _impl->version;
+        return _data->version;
     }
 
     const VersionNumber &PluginSpec::compatVersion() const {
-        return _impl->compatVersion;
+        return _data->compatVersion;
+    }
+
+    const std::vector<PluginDependency> &PluginSpec::dependencies() const {
+        return _data->dependencies;
     }
 
     const std::filesystem::path &PluginSpec::filePath() const {
-        return _impl->loader->filePath();
+        return _data->loader->filePath();
     }
 
 }

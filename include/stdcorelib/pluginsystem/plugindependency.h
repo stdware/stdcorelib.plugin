@@ -4,6 +4,7 @@
 #define STDCORELIB_PLUGINSYSTEM_PLUGINDEPENDENCY_H
 
 #include <string>
+#include <utility>
 
 #include <stdcorelib/support/versionnumber.h>
 
@@ -20,15 +21,23 @@ namespace stdc::pluginsystem {
             Optional,
         };
 
-        PluginDependency(std::string id, VersionNumber version, Type type = Required);
+        inline PluginDependency(std::string id, VersionNumber version, Type type = Required)
+            : _id(std::move(id)), _version(std::move(version)), _type(type) {
+        }
 
         /// The stable plugin identifier this dependency names.
-        const std::string &id() const;
+        inline const std::string &id() const {
+            return _id;
+        }
 
         /// The version requested by the declaring plugin.
-        const VersionNumber &version() const;
+        inline const VersionNumber &version() const {
+            return _version;
+        }
 
-        Type type() const;
+        inline Type type() const {
+            return _type;
+        }
 
     private:
         std::string _id;

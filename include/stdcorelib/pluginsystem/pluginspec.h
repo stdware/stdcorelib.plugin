@@ -4,14 +4,16 @@
 #define STDCORELIB_PLUGINSYSTEM_PLUGINSPEC_H
 
 #include <filesystem>
-#include <memory>
 #include <string>
+#include <vector>
 
 #include <stdcorelib/support/versionnumber.h>
 
-#include <stdcorelib/plugin/pluginloader.h>
+#include <stdcorelib/pluginsystem/plugindependency.h>
 
 namespace stdc::pluginsystem {
+
+    class PluginSpecData;
 
     /// Describes one plugin discovered by a PluginSystem.
     class STDC_PLUGIN_EXPORT PluginSpec {
@@ -34,14 +36,6 @@ namespace stdc::pluginsystem {
             Stopped,
         };
 
-        /// Creates a spec for \a loader, which must outlive this object.
-        explicit PluginSpec(plugin::PluginLoader &loader);
-        ~PluginSpec();
-
-        PluginSpec(PluginSpec &&RHS) noexcept;
-        PluginSpec &operator=(PluginSpec &&RHS) noexcept;
-
-    public:
         State state() const;
         bool hasError() const;
         const std::string &errorMessage() const;
@@ -54,15 +48,19 @@ namespace stdc::pluginsystem {
 
         const VersionNumber &version() const;
         const VersionNumber &compatVersion() const;
+        const std::vector<PluginDependency> &dependencies() const;
 
-        /// The shared library path, or empty for a static or runtime plugin.
+        /// The plugin shared library path.
         const std::filesystem::path &filePath() const;
 
-    protected:
-        class Impl;
-        std::unique_ptr<Impl> _impl;
+    private:
+        explicit PluginSpec(PluginSpecData *data);
 
-        STDC_DISABLE_COPY(PluginSpec)
+        PluginSpecData *_data;
+
+        friend class PluginSpecData;
+
+        STDC_DISABLE_COPY_MOVE(PluginSpec)
     };
 
 }
