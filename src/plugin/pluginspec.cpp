@@ -127,9 +127,7 @@ namespace stdc {
         }
 
         auto so = std::make_unique<SharedLibrary>();
-        // TODO: ask for the library's own directory to be searched for its dependencies once
-        // stdcorelib grows a hint for it, so that a plugin can ship private libraries beside it.
-        if (!so->open(filePath)) {
+        if (!so->open(filePath, SharedLibrary::SearchLibraryLoadDirectoryHint)) {
             return reportError(formatN(R"(%1: %2)", filePath, so->errorMessage()));
         }
 
