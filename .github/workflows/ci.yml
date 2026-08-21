@@ -214,4 +214,6 @@ jobs:
 
       - name: Test
         shell: msys2 {0}
-        run: ctest --test-dir build --output-on-failure --no-tests=error
+        run: |
+          export PATH="$(cygpath -u "$RUNNER_TEMP")/stdcorelib/bin:$PATH"
+          ctest --test-dir build --output-on-failure --no-tests=error
