@@ -39,6 +39,9 @@ namespace stdc::plugin {
         PluginFactory();
         virtual ~PluginFactory();
 
+        PluginFactory(PluginFactory &&RHS) noexcept;
+        PluginFactory &operator=(PluginFactory &&RHS) noexcept;
+
     public:
         /// Takes the statically linked plugins registered under \a pluginSet into this factory.
         ///
@@ -73,7 +76,7 @@ namespace stdc::plugin {
 
         explicit PluginFactory(Impl &impl);
 
-        STDC_DISABLE_COPY_MOVE(PluginFactory)
+        STDC_DISABLE_COPY(PluginFactory)
     };
 
     /// @}

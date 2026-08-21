@@ -15,11 +15,8 @@ namespace stdc::plugin {
 
     class STDC_PLUGIN_EXPORT PluginFactory::Impl {
     public:
-        explicit Impl(PluginFactory *decl);
+        Impl();
         virtual ~Impl();
-
-        using Decl = PluginFactory;
-        PluginFactory *_decl;
 
     public:
         /// Builds an empty loader this factory owns.

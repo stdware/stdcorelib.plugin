@@ -15,6 +15,10 @@ namespace {
     static_assert(std::is_move_assignable_v<stdc::plugin::PluginLoader>);
     static_assert(!std::is_copy_constructible_v<stdc::plugin::PluginLoader>);
     static_assert(!std::is_copy_assignable_v<stdc::plugin::PluginLoader>);
+    static_assert(std::is_move_constructible_v<stdc::plugin::PluginFactory>);
+    static_assert(std::is_move_assignable_v<stdc::plugin::PluginFactory>);
+    static_assert(!std::is_copy_constructible_v<stdc::plugin::PluginFactory>);
+    static_assert(!std::is_copy_assignable_v<stdc::plugin::PluginFactory>);
     static_assert(std::is_same_v<stdc::plugin::StaticPluginRegistry::result_type,
                                  stdc::plugin::StaticPlugin>);
 
@@ -44,6 +48,18 @@ BOOST_AUTO_TEST_CASE(test_registry) {
 }
 
 BOOST_AUTO_TEST_CASE(test_loader_origin) {
+    const auto staticPlugins = stdc::plugin::PluginLoader::staticPlugins("test");
+    BOOST_REQUIRE_EQUAL(staticPlugins.size(), 1u);
+
+    stdc::plugin::PluginLoader loader(staticPlugins.front());
+    BOOST_CHECK_EQUAL(loader.origin(), stdc::plugin::PluginLoader::Static);
+    BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Read);
+    BOOST_CHECK(!loader.plugin());
+
+    BOOST_REQUIRE_MESSAGE(loader.load(), loader.errorMessage());
+    BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Loaded);
+    BOOST_CHECK(loader.plugin());
+
     stdc::plugin::PluginFactory factory;
     factory.addStaticPlugins("test");
 

@@ -43,6 +43,7 @@ namespace stdc::plugin {
                          const std::optional<std::filesystem::path> &metadataPath = {});
         bool readMetadata(const json::Value &root, const std::filesystem::path &sourcePath,
                           const std::filesystem::path &boundFilePath = {});
+        bool setStaticPlugin(const StaticPlugin &plugin);
         bool setRuntimePlugin(Plugin *plugin, const json::Value &metadata);
 
         static bool readEmbeddedMetadata(const std::filesystem::path &filePath,

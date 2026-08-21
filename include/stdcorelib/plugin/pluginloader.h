@@ -37,6 +37,7 @@ namespace stdc::plugin {
         PluginLoader();
         explicit PluginLoader(const std::filesystem::path &filePath,
                               const std::optional<std::filesystem::path> &metadataPath = {});
+        explicit PluginLoader(const StaticPlugin &plugin);
         PluginLoader(Plugin *plugin, const json::Value &metadata);
         ~PluginLoader();
 
@@ -77,6 +78,11 @@ namespace stdc::plugin {
         ///                     in the plugin library.
         void setFilePath(const std::filesystem::path &filePath,
                          const std::optional<std::filesystem::path> &metadataPath = {});
+
+        /// Selects a statically registered plugin without creating its instance.
+        ///
+        /// \param plugin The registered plugin descriptor and metadata provider.
+        void setStaticPlugin(const StaticPlugin &plugin);
 
         /// Selects a plugin instance that the program already owns.
         ///

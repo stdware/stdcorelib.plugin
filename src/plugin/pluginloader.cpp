@@ -164,6 +164,22 @@ namespace stdc::plugin {
         return true;
     }
 
+    bool PluginLoader::Impl::setStaticPlugin(const StaticPlugin &staticPlugin) {
+        reset();
+        origin = PluginLoader::Static;
+        staticInstance = staticPlugin.instance;
+        metadata = staticPlugin.metadata ? staticPlugin.metadata() : json::Value();
+
+        auto staticIid = metadata["iid"];
+        if (!staticIid.isString() || staticIid.toString().empty()) {
+            return reportError("static plugin declares no iid");
+        }
+
+        iid = staticIid.toString();
+        state = PluginLoader::Read;
+        return true;
+    }
+
     bool PluginLoader::Impl::setRuntimePlugin(Plugin *runtimePlugin,
                                               const json::Value &runtimeMetadata) {
         reset();
@@ -255,6 +271,10 @@ namespace stdc::plugin {
         _impl->readLibrary(filePath, metadataPath);
     }
 
+    PluginLoader::PluginLoader(const StaticPlugin &plugin) : PluginLoader() {
+        _impl->setStaticPlugin(plugin);
+    }
+
     PluginLoader::PluginLoader(Plugin *plugin, const json::Value &metadata) : PluginLoader() {
         _impl->setRuntimePlugin(plugin, metadata);
     }
@@ -269,6 +289,11 @@ namespace stdc::plugin {
                                    const std::optional<std::filesystem::path> &metadataPath) {
         stdc_impl_t;
         impl.readLibrary(filePath, metadataPath);
+    }
+
+    void PluginLoader::setStaticPlugin(const StaticPlugin &plugin) {
+        stdc_impl_t;
+        impl.setStaticPlugin(plugin);
     }
 
     void PluginLoader::setPlugin(Plugin *plugin, const json::Value &metadata) {

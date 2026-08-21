@@ -19,7 +19,7 @@ namespace stdc::plugin {
     /// The file that says what a plugin is. One per plugin directory.
     static constexpr const char *manifestName = "plugin.json";
 
-    PluginFactory::Impl::Impl(PluginFactory *decl) : _decl(decl) {
+    PluginFactory::Impl::Impl() {
     }
 
     PluginFactory::Impl::~Impl() = default;
@@ -84,7 +84,7 @@ namespace stdc::plugin {
         }
     }
 
-    PluginFactory::PluginFactory() : _impl(new Impl(this)) {
+    PluginFactory::PluginFactory() : _impl(new Impl()) {
     }
 
     PluginFactory::PluginFactory(Impl &impl) : _impl(&impl) {
@@ -92,26 +92,17 @@ namespace stdc::plugin {
 
     PluginFactory::~PluginFactory() = default;
 
+    PluginFactory::PluginFactory(PluginFactory &&RHS) noexcept = default;
+
+    PluginFactory &PluginFactory::operator=(PluginFactory &&RHS) noexcept = default;
+
     void PluginFactory::addStaticPlugins(std::string_view pluginSet) {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
         for (const StaticPlugin &plugin : PluginLoader::staticPlugins(pluginSet)) {
-            auto loader = Impl::createLoader();
-            auto &loaderImpl = *loader->_impl;
-            loaderImpl.origin = PluginLoader::Static;
-            loaderImpl.staticInstance = plugin.instance;
-            loaderImpl.metadata = plugin.metadata ? plugin.metadata() : json::Value();
-            loaderImpl.state = PluginLoader::Read;
-
-            auto iid = loaderImpl.metadata["iid"];
-            if (!iid.isString() || iid.toString().empty()) {
-                loaderImpl.reportError(
-                    formatN(R"(static plugin in set "%1" declares no iid)", pluginSet));
-            } else {
-                loaderImpl.iid = iid.toString();
-            }
-            impl.loaders[loaderImpl.iid].emplace_back(std::move(loader));
+            auto loader = std::make_unique<PluginLoader>(plugin);
+            impl.loaders[loader->iid()].emplace_back(std::move(loader));
         }
     }
 
