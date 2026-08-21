@@ -61,6 +61,14 @@ find_package(stdcorelib REQUIRED)
 # Main Project
 # ----------------------------------
 file(GLOB _src src/plugin/*.cpp)
+list(FILTER _src EXCLUDE REGEX "pluginmetadata_(win|linux|mac)\\.cpp$")
+if(WIN32)
+    list(APPEND _src src/plugin/pluginmetadata_win.cpp)
+elseif(APPLE)
+    list(APPEND _src src/plugin/pluginmetadata_mac.cpp)
+else()
+    list(APPEND _src src/plugin/pluginmetadata_linux.cpp)
+endif()
 
 if(STDC_PLUGIN_BUILD_STATIC OR(NOT STDC_PLUGIN_BUILD_SHARED AND NOT BUILD_SHARED_LIBS))
     add_library(${PROJECT_NAME} STATIC)
