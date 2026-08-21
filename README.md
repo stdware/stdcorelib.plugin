@@ -1,2 +1,3 @@
-# stdcorelib.plugin
+# STDCORELIB.PLUGIN
+
 Plugin framework for STDCORELIB.
