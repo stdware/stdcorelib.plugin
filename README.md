@@ -1,3 +1,3 @@
 # STDCORELIB.PLUGIN
 
-Plugin framework for STDCORELIB.
+Plugin management module.
