@@ -31,13 +31,17 @@ namespace stdc::plugin {
         library.reset();
         plugin = nullptr;
         state = PluginLoader::Null;
-        hasError = false;
-        errorMessage.clear();
+        clearError();
         iid.clear();
         filePath.clear();
         metadata = json::Value();
         origin = PluginLoader::FileSystem;
         staticInstance = nullptr;
+    }
+
+    void PluginLoader::Impl::clearError() {
+        hasError = false;
+        errorMessage.clear();
     }
 
     bool PluginLoader::Impl::reportError(std::string err, PluginLoader::State errorState) {
@@ -132,15 +136,13 @@ namespace stdc::plugin {
         }
 
         // Whatever is in here belongs to the extension point named by iid. Check that it is an
-        // object and leave it alone otherwise, an absent one meaning an empty one.
+        // object and leave the complete manifest alone otherwise.
         if (auto it = obj.find("metadata"); it != obj.end()) {
             if (!it->second.isObject()) {
                 return reportError(formatN(R"(%1: "metadata" field is not an object)", sourcePath));
             }
-            metadata = it->second;
-        } else {
-            metadata = json::Object();
         }
+        metadata = root;
 
         state = PluginLoader::Read;
         return true;
@@ -183,11 +185,12 @@ namespace stdc::plugin {
     }
 
     bool PluginLoader::Impl::loadLibrary() {
+        if (state == PluginLoader::Loaded) {
+            clearError();
+            return true;
+        }
         if (hasError) {
             return false;
-        }
-        if (state == PluginLoader::Loaded) {
-            return true;
         }
 
         if (origin == PluginLoader::Static) {
@@ -231,6 +234,8 @@ namespace stdc::plugin {
             return true;
         }
         if (origin != PluginLoader::FileSystem) {
+            errorMessage = "static and runtime plugins cannot be unloaded";
+            hasError = true;
             return false;
         }
         if (!library->close()) {
@@ -241,6 +246,7 @@ namespace stdc::plugin {
         library.reset();
         plugin = nullptr;
         state = PluginLoader::Read;
+        clearError();
         return true;
     }
 

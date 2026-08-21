@@ -24,10 +24,9 @@ namespace stdc::plugin {
 
     /// Reads, loads, and owns one plugin library.
     ///
-    /// A loader is created for every plugin the factory finds, including the ones it cannot use. A
-    /// plugin whose manifest is malformed, or whose library refuses to load, keeps its loader and
-    /// answers \c hasError(), so the reason can be reported instead of the plugin quietly not
-    /// being there.
+    /// A candidate without a valid IID is silently ignored by the factory. Once its IID has been
+    /// read, later metadata or loading failures stay on its loader and answer \c hasError(), so
+    /// the reason can be reported instead of the plugin quietly not being there.
     ///
     /// Metadata is read from the library without executing its code. Nothing is loaded until
     /// \c load() is called, so installed plugins can be described without pulling in the
@@ -91,10 +90,16 @@ namespace stdc::plugin {
         void setPlugin(Plugin *plugin, const json::Value &metadata);
 
         State state() const;
+
+        /// Where the selected plugin comes from.
+        ///
+        /// \note This has no meaning while \c state() is \c Null.
         Origin origin() const;
+
+        /// Whether the last operation failed.
         bool hasError() const;
 
-        /// Why this plugin is unusable, empty if it is not.
+        /// Why the last operation failed, empty after a successful load or unload.
         const std::string &errorMessage() const;
 
     public:
@@ -107,9 +112,7 @@ namespace stdc::plugin {
         /// The shared library, or empty for a static or runtime plugin.
         const std::filesystem::path &filePath() const;
 
-        /// What this plugin says about itself, in whatever shape its extension point defines.
-        ///
-        /// The library never looks inside.
+        /// The complete metadata manifest, including \c $version, \c iid, and \c metadata.
         const json::Value &metadata() const;
 
     public:
@@ -123,7 +126,7 @@ namespace stdc::plugin {
         ///
         /// Returns true if the plugin is already unloaded. A loaded static or runtime plugin
         /// cannot be unloaded because its lifetime is not controlled by this loader, so calling
-        /// this function on one returns false.
+        /// this function on one returns false with the reason in \c errorMessage().
         bool unload();
 
         inline bool isLoaded() const {

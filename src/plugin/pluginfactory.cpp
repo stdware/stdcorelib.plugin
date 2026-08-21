@@ -40,15 +40,18 @@ namespace stdc::plugin {
         }
 
         auto &known = loaders[std::string(iid)];
+        bool scanSucceeded = true;
         for (const auto &root : it->second) {
             std::vector<std::filesystem::path> candidates;
             if (!factory.scanPluginPaths(root, &candidates)) {
+                scanSucceeded = false;
                 continue;
             }
             for (const auto &candidate : candidates) {
                 std::filesystem::path pluginPath;
                 std::optional<std::filesystem::path> metadataPath;
                 if (!factory.resolvePluginPath(candidate, &pluginPath, &metadataPath)) {
+                    scanSucceeded = false;
                     continue;
                 }
 
@@ -67,8 +70,10 @@ namespace stdc::plugin {
             }
         }
 
-        if (auto dirty = pluginsDirty.find(iid); dirty != pluginsDirty.end()) {
-            pluginsDirty.erase(dirty);
+        if (scanSucceeded) {
+            if (auto dirty = pluginsDirty.find(iid); dirty != pluginsDirty.end()) {
+                pluginsDirty.erase(dirty);
+            }
         }
     }
 
@@ -92,7 +97,7 @@ namespace stdc::plugin {
             return false;
         }
         for (const auto &entry : dir) {
-            if (entry.is_directory()) {
+            if (entry.is_directory() && fs::is_regular_file(entry.path() / manifestName)) {
                 pluginPaths->push_back(entry.path());
             }
         }

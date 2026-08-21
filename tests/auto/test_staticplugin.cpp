@@ -59,6 +59,7 @@ BOOST_AUTO_TEST_CASE(test_loader_origin) {
     BOOST_CHECK_EQUAL(loader.origin(), stdc::plugin::PluginLoader::Static);
     BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Read);
     BOOST_CHECK(!loader.plugin());
+    BOOST_CHECK_EQUAL(loader.metadata()["iid"].toString(), "org.stdcorelib.Test");
 
     BOOST_REQUIRE_MESSAGE(loader.load(), loader.errorMessage());
     BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Loaded);

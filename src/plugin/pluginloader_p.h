@@ -45,6 +45,7 @@ namespace stdc::plugin {
                                          std::string *metadata, std::string *errorMessage);
 
         void reset();
+        void clearError();
 
         bool loadLibrary();
         bool unloadLibrary();

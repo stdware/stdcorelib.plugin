@@ -35,6 +35,10 @@ namespace stdc::plugin {
     ///  - filesystem plugins: a directory per plugin, holding a plugin.json and the library
     ///  - static plugins    : linked into the program, handing over the same metadata directly
     ///  - runtime plugins   : instances the program supplies, owned by the program
+    ///
+    /// Changing the search paths only affects later scans. Loaders already discovered are kept,
+    /// and a loaded plugin is not unloaded when the paths for its IID change. Programs should set
+    /// all plugin paths before they first query or load plugins.
     class STDC_PLUGIN_EXPORT PluginFactory {
     public:
         PluginFactory();
@@ -77,6 +81,8 @@ namespace stdc::plugin {
         /// \param path The directory registered with \c addPluginPath().
         /// \param pluginPaths Receives the candidate paths to resolve.
         /// \return Whether the directory was scanned successfully.
+        /// \warning This is called while the factory is locked. An override must not call any
+        ///          function on this factory.
         virtual bool scanPluginPaths(const std::filesystem::path &path,
                                      std::vector<std::filesystem::path> *pluginPaths) const;
 
@@ -88,6 +94,8 @@ namespace stdc::plugin {
         /// \param pluginPath Receives the plugin library path.
         /// \param metadataPath Receives an optional external metadata JSON path.
         /// \return Whether the candidate was resolved successfully.
+        /// \warning This is called while the factory is locked. An override must not call any
+        ///          function on this factory.
         virtual bool resolvePluginPath(const std::filesystem::path &path,
                                        std::filesystem::path *pluginPath,
                                        std::optional<std::filesystem::path> *metadataPath) const;
