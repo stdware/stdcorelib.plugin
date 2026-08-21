@@ -38,7 +38,8 @@ namespace stdc::pluginsystem {
         std::string iid;
         PluginLayout layout;
         std::unique_ptr<plugin::PluginFactory> factory;
-        PluginSettings settings;
+        PluginSettings globalSettings;
+        PluginSettings localSettings;
         mutable linked_map<plugin::PluginLoader *, PluginSpecData> pluginData;
         /// Protects the path configuration, discovery cache, and transition to loadStarted.
         mutable std::shared_mutex configMtx;

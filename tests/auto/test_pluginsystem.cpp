@@ -254,7 +254,7 @@ BOOST_AUTO_TEST_CASE(test_dependency_metadata) {
                       stdc::pluginsystem::PluginDependency::Optional);
 }
 
-BOOST_AUTO_TEST_CASE(test_settings_override_metadata_default_and_freeze_at_load) {
+BOOST_AUTO_TEST_CASE(test_global_and_local_settings_precedence_and_freeze_at_load) {
     TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
     directory.addPlugin(
         "plugin", R"({"id":"Plugin","name":"Plugin","version":"1.0","enabledByDefault":false})");
@@ -267,19 +267,40 @@ BOOST_AUTO_TEST_CASE(test_settings_override_metadata_default_and_freeze_at_load)
     BOOST_CHECK(!spec->enabledByDefault());
     BOOST_CHECK(!spec->isEnabled());
 
-    stdc::pluginsystem::PluginSettings settings;
-    settings.setPluginEnabled("Plugin", true);
-    system.setPluginSettings(settings);
+    stdc::pluginsystem::PluginSettings globalSettings;
+    globalSettings.setPluginEnabled("Plugin", true);
+    stdc::pluginsystem::PluginSettings localSettings;
+    localSettings.setPluginEnabled("Plugin", false);
+    system.setGlobalPluginSettings(globalSettings);
+    system.setLocalPluginSettings(localSettings);
+    BOOST_CHECK(spec->enabledByDefault());
+    BOOST_CHECK(!spec->isEnabled());
+
+    localSettings.resetPlugin("Plugin");
+    system.setLocalPluginSettings(localSettings);
+    BOOST_CHECK(spec->enabledByDefault());
+    BOOST_CHECK(spec->isEnabled());
+
+    globalSettings.setPluginEnabled("Plugin", false);
+    localSettings.setPluginEnabled("Plugin", true);
+    system.setGlobalPluginSettings(globalSettings);
+    system.setLocalPluginSettings(localSettings);
+    BOOST_CHECK(!spec->enabledByDefault());
     BOOST_CHECK(spec->isEnabled());
 
     system.loadPlugins();
     BOOST_CHECK_EQUAL(spec->state(), stdc::pluginsystem::PluginSpec::Running);
 
-    settings.setPluginEnabled("Plugin", false);
-    system.setPluginSettings(settings);
+    globalSettings.setPluginEnabled("Plugin", true);
+    localSettings.setPluginEnabled("Plugin", false);
+    system.setGlobalPluginSettings(globalSettings);
+    system.setLocalPluginSettings(localSettings);
+    BOOST_CHECK(!spec->enabledByDefault());
     BOOST_CHECK(spec->isEnabled());
-    BOOST_REQUIRE(system.pluginSettings().pluginEnabled("Plugin"));
-    BOOST_CHECK(*system.pluginSettings().pluginEnabled("Plugin"));
+    BOOST_REQUIRE(system.globalPluginSettings().pluginEnabled("Plugin"));
+    BOOST_CHECK(!*system.globalPluginSettings().pluginEnabled("Plugin"));
+    BOOST_REQUIRE(system.localPluginSettings().pluginEnabled("Plugin"));
+    BOOST_CHECK(*system.localPluginSettings().pluginEnabled("Plugin"));
 }
 
 BOOST_AUTO_TEST_CASE(test_disabled_dependencies) {
@@ -298,7 +319,7 @@ BOOST_AUTO_TEST_CASE(test_disabled_dependencies) {
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
                                             stdc::pluginsystem::PluginSystem::Directory);
     system.setPluginPaths(directory.path());
-    system.setPluginSettings(settings);
+    system.setLocalPluginSettings(settings);
     system.loadPlugins();
 
     const auto specs = system.plugins();

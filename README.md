@@ -73,9 +73,12 @@ stdc::pluginsystem::PluginSystem plugins("org.example.ApplicationPlugin");
 const std::vector<std::filesystem::path> paths{"plugins"};
 plugins.setPluginPaths(paths);
 
-stdc::pluginsystem::PluginSettings settings;
-settings.setPluginEnabled("org.example.diagnostics", false);
-plugins.setPluginSettings(settings);
+stdc::pluginsystem::PluginSettings globalSettings;
+globalSettings.setPluginEnabled("org.example.experimental", true);
+plugins.setGlobalPluginSettings(globalSettings);
+stdc::pluginsystem::PluginSettings localSettings;
+localSettings.setPluginEnabled("org.example.diagnostics", false);
+plugins.setLocalPluginSettings(localSettings);
 
 plugins.loadPlugins();
 for (const auto *spec : plugins.plugins()) {
@@ -93,7 +96,7 @@ Loading and initialization follow dependency order. `pluginInitialized()` and `a
 
 ## Enabled-state settings
 
-`PluginSettings` is independent of file I/O. It converts between an in-memory JSON value and explicit overrides, preserves unknown plugin IDs, and rejects duplicate or conflicting IDs.
+`PluginSettings` represents one settings source and is independent of file I/O. A host supplies separate global and local values to `PluginSystem`: global settings turn the manifest value into the effective `enabledByDefault()`, then local settings produce the final `isEnabled()`. This corresponds to system-wide and per-user settings without coupling the value type to storage paths. Each value converts between an in-memory JSON value and explicit overrides, preserves unknown plugin IDs, and rejects duplicate or conflicting IDs.
 
 ```json
 {
@@ -102,4 +105,4 @@ Loading and initialization follow dependency order. `pluginInitialized()` and `a
 }
 ```
 
-An explicit setting overrides `enabledByDefault`. A disabled required dependency makes its dependent plugin invalid; a disabled optional dependency is treated as absent. Disabled plugins do not count as errors by themselves.
+A disabled required dependency makes its dependent plugin invalid; a disabled optional dependency is treated as absent. Disabled plugins do not count as errors by themselves.

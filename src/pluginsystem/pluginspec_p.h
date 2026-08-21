@@ -25,6 +25,7 @@ namespace stdc::pluginsystem {
         VersionNumber version;
         VersionNumber compatVersion;
         std::vector<PluginDependency> dependencies;
+        bool enabledByMetadata = true;
         bool enabledByDefault = true;
         bool enabled = true;
         IPlugin *plugin = nullptr;

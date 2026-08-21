@@ -95,7 +95,8 @@ namespace stdc::pluginsystem {
     void PluginSystem::Impl::applySettings() const {
         for (auto &item : pluginData) {
             auto &data = item.second;
-            data.enabled = settings.isPluginEnabled(data.id, data.enabledByDefault);
+            data.enabledByDefault = globalSettings.isPluginEnabled(data.id, data.enabledByMetadata);
+            data.enabled = localSettings.isPluginEnabled(data.id, data.enabledByDefault);
         }
     }
 
@@ -361,20 +362,36 @@ namespace stdc::pluginsystem {
         return impl.factory->pluginPaths(impl.iid);
     }
 
-    void PluginSystem::setPluginSettings(PluginSettings settings) {
+    void PluginSystem::setGlobalPluginSettings(PluginSettings settings) {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.configMtx);
         if (impl.loadStarted) {
             return;
         }
-        impl.settings = std::move(settings);
+        impl.globalSettings = std::move(settings);
         impl.applySettings();
     }
 
-    PluginSettings PluginSystem::pluginSettings() const {
+    PluginSettings PluginSystem::globalPluginSettings() const {
         stdc_impl_t;
         std::shared_lock<std::shared_mutex> lock(impl.configMtx);
-        return impl.settings;
+        return impl.globalSettings;
+    }
+
+    void PluginSystem::setLocalPluginSettings(PluginSettings settings) {
+        stdc_impl_t;
+        std::unique_lock<std::shared_mutex> lock(impl.configMtx);
+        if (impl.loadStarted) {
+            return;
+        }
+        impl.localSettings = std::move(settings);
+        impl.applySettings();
+    }
+
+    PluginSettings PluginSystem::localPluginSettings() const {
+        stdc_impl_t;
+        std::shared_lock<std::shared_mutex> lock(impl.configMtx);
+        return impl.localSettings;
     }
 
     std::vector<PluginSpec *> PluginSystem::plugins() const {

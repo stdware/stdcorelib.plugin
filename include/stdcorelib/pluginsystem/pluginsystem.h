@@ -50,11 +50,23 @@ namespace stdc::pluginsystem {
         void setPluginPaths(array_view<std::filesystem::path> paths);
         std::vector<std::filesystem::path> pluginPaths() const;
 
-        /// Replaces user enabled-state overrides before loadPlugins() starts.
+        /// Replaces system-wide enabled-state overrides before loadPlugins() starts.
         ///
-        /// Calls after loadPlugins() starts have no effect.
-        void setPluginSettings(PluginSettings settings);
-        PluginSettings pluginSettings() const;
+        /// Global settings override plugin metadata. Calls after loadPlugins() starts have no
+        /// effect.
+        void setGlobalPluginSettings(PluginSettings settings);
+
+        /// Returns the global settings used as system-wide plugin defaults.
+        PluginSettings globalPluginSettings() const;
+
+        /// Replaces per-user enabled-state overrides before loadPlugins() starts.
+        ///
+        /// Local settings override global settings. Calls after loadPlugins() starts have no
+        /// effect.
+        void setLocalPluginSettings(PluginSettings settings);
+
+        /// Returns the local settings that override global settings for the current user.
+        PluginSettings localPluginSettings() const;
 
         /// Returns every discovered spec, preserving each pointer for this system's lifetime.
         std::vector<PluginSpec *> plugins() const;

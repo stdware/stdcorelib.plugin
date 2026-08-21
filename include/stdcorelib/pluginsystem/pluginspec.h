@@ -51,7 +51,7 @@ namespace stdc::pluginsystem {
         const VersionNumber &compatVersion() const;
         const std::vector<PluginDependency> &dependencies() const;
 
-        /// Whether metadata enables this plugin when settings contain no override.
+        /// Whether metadata and global settings enable this plugin before local overrides.
         bool enabledByDefault() const;
 
         /// Whether this plugin was enabled when loadPlugins() froze the plugin set.

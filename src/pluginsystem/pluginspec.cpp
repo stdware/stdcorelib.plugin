@@ -69,8 +69,9 @@ namespace stdc::pluginsystem {
             if (!enabledValue.isBool()) {
                 return reportError("invalid plugin enabledByDefault value");
             }
-            enabledByDefault = enabledValue.toBool();
-            enabled = enabledByDefault;
+            enabledByMetadata = enabledValue.toBool();
+            enabledByDefault = enabledByMetadata;
+            enabled = enabledByMetadata;
         }
 
         const auto &dependencyValues = metadata["dependencies"];

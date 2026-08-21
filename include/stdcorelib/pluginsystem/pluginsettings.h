@@ -15,7 +15,7 @@
 
 namespace stdc::pluginsystem {
 
-    /// User overrides for plugin enabled states, keyed by stable plugin ID.
+    /// One source of plugin enabled-state overrides, keyed by stable plugin ID.
     class STDC_PLUGIN_EXPORT PluginSettings {
     public:
         /// Records an explicit enabled state for \a id, replacing its previous override.
