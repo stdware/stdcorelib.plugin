@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.16)
 
 project(stdcorelib-plugin VERSION 0.1.0.0 LANGUAGES CXX)
 
+include(cmake/AddPlugin.cmake)
+
 # ----------------------------------
 # Build Options
 # ----------------------------------
@@ -156,6 +158,8 @@ if(STDC_PLUGIN_INSTALL)
     install(FILES
         "${CMAKE_CURRENT_BINARY_DIR}/${STDC_PLUGIN_INSTALL_NAME}Config.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/${STDC_PLUGIN_INSTALL_NAME}ConfigVersion.cmake"
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/AddPlugin.cmake"
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GeneratePluginMetadata.cmake"
         DESTINATION ${_install_dir}
     )
 

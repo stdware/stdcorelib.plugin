@@ -18,6 +18,9 @@ set(_plugin_dir ${CMAKE_CURRENT_SOURCE_DIR}/plugins/pluginloader_test_plugin)
 add_library(pluginloader_test_plugin MODULE ${_plugin_dir}/pluginloader_test_plugin.cpp)
 target_link_libraries(pluginloader_test_plugin PRIVATE stdcorelib::plugin)
 set_target_properties(pluginloader_test_plugin PROPERTIES PREFIX "")
+stdc_add_plugin_metadata(pluginloader_test_plugin
+    ${_plugin_dir}/pluginloader_test_plugin.json
+)
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     TEST_PLUGINLOADER_PLUGIN_PATH="$<TARGET_FILE:pluginloader_test_plugin>"
