@@ -4,6 +4,7 @@
 #define STDCORELIB_PLUGIN_PLUGIN_H
 
 #include <stdcorelib/support/json.h>
+#include <stdcorelib/support/staticregistry.h>
 
 #include <stdcorelib/stdc_plugin_global.h>
 
@@ -39,10 +40,12 @@ namespace stdc {
         PluginInstanceFunction instance = nullptr;
         MetadataFunction metadata = nullptr;
 
-    public:
-        STDC_PLUGIN_EXPORT static void registerStaticPlugin(const char *pluginSet,
-                                                            StaticPlugin plugin);
     };
+
+    /// The process-wide registry of plugins linked into the program.
+    using StaticPluginRegistry = StaticRegistry<StaticPlugin>;
+
+    extern template class STDC_PLUGIN_EXPORT StaticRegistry<StaticPlugin>;
 
     /// @}
 
@@ -64,17 +67,15 @@ namespace stdc {
 /// held. It is evaluated the first time the metadata is asked for, not during registration.
 #define STDC_EXPORT_STATIC_PLUGIN(PLUGIN_NAME, PLUGIN_SET, METADATA)                               \
     namespace {                                                                                    \
-        struct PLUGIN_NAME##_initializer {                                                         \
-            PLUGIN_NAME##_initializer() {                                                          \
-                stdc::StaticPlugin::registerStaticPlugin(                                          \
-                    PLUGIN_SET, stdc::StaticPlugin(                                                \
-                                    []() -> stdc::Plugin * {                                       \
-                                        static PLUGIN_NAME _instance;                              \
-                                        return &_instance;                                         \
-                                    },                                                             \
-                                    []() -> stdc::json::Value { return (METADATA); }));            \
-            }                                                                                      \
-        } PLUGIN_NAME##_initializer_instance;                                                      \
+        stdc::StaticPluginRegistry::AddFactory PLUGIN_NAME##_initializer(                           \
+            PLUGIN_SET, "", []() -> std::unique_ptr<stdc::StaticPlugin> {                          \
+                return std::make_unique<stdc::StaticPlugin>(                                       \
+                    []() -> stdc::Plugin * {                                                        \
+                        static PLUGIN_NAME _instance;                                               \
+                        return &_instance;                                                          \
+                    },                                                                             \
+                    []() -> stdc::json::Value { return (METADATA); });                             \
+            });                                                                                    \
     }
 
 #endif // STDCORELIB_PLUGIN_PLUGIN_H

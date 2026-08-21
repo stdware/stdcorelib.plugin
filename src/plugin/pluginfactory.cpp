@@ -13,32 +13,12 @@
 
 namespace fs = std::filesystem;
 
+STDC_INSTANTIATE_STATIC_REGISTRY_EXPORT(stdc::StaticPlugin, STDC_PLUGIN_EXPORT)
+
 namespace stdc {
 
     /// The file that says what a plugin is. One per plugin directory.
     static constexpr const char *manifestName = "plugin.json";
-
-    using StaticPluginMap = std::map<std::string, vlarray<StaticPlugin, 10>>;
-
-    static StaticPluginMap &getStaticPluginMap() {
-        static StaticPluginMap staticPluginMap;
-        return staticPluginMap;
-    }
-
-    void StaticPlugin::registerStaticPlugin(const char *pluginSet, StaticPlugin plugin) {
-        auto &plugins = getStaticPluginMap()[pluginSet];
-
-        // Sorted by address, so that registering the same plugin twice is noticed rather than
-        // leaving two entries that produce the same instance.
-        static const auto comparator = [=](const StaticPlugin &p1, const StaticPlugin &p2) {
-            using Less = std::less<decltype(plugin.instance)>;
-            return Less{}(p1.instance, p2.instance);
-        };
-        auto pos = std::lower_bound(plugins.begin(), plugins.end(), plugin, comparator);
-        if (pos == plugins.end() || pos->instance != plugin.instance) {
-            plugins.insert(pos, plugin);
-        }
-    }
 
     PluginFactory::Impl::Impl(PluginFactory *decl) : _decl(decl) {
     }
@@ -113,22 +93,24 @@ namespace stdc {
     PluginFactory::~PluginFactory() = default;
 
     std::vector<std::string> PluginFactory::staticPluginSets() {
-        auto &map = getStaticPluginMap();
         std::vector<std::string> pluginSets;
-        pluginSets.reserve(map.size());
-        for (const auto &item : map) {
-            pluginSets.push_back(item.first);
+        for (const auto &entry : StaticPluginRegistry::entries()) {
+            auto pluginSet = std::string(entry.name());
+            if (std::find(pluginSets.begin(), pluginSets.end(), pluginSet) == pluginSets.end()) {
+                pluginSets.push_back(std::move(pluginSet));
+            }
         }
         return pluginSets;
     }
 
     std::vector<StaticPlugin> PluginFactory::staticPlugins(const char *pluginSet) {
-        auto &map = getStaticPluginMap();
-        auto it = map.find(pluginSet);
-        if (it == map.end()) {
-            return {};
+        std::vector<StaticPlugin> plugins;
+        for (const auto &entry : StaticPluginRegistry::entries()) {
+            if (entry.name() == pluginSet) {
+                plugins.push_back(*entry.instantiate());
+            }
         }
-        return {it->second.begin(), it->second.end()};
+        return plugins;
     }
 
     void PluginFactory::addStaticPlugins(const char *pluginSet) {
