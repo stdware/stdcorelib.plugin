@@ -77,7 +77,7 @@ extern template class STDC_PLUGIN_EXPORT stdc::StaticRegistry<stdc::plugin::Stat
 ///
 /// The array must contain a complete plugin metadata JSON document. Give the array external
 /// linkage or otherwise make sure the linker retains it in the finished plugin library.
-#if defined(_WIN32) && defined(_MSC_VER)
+#if defined(_WIN32) && defined(_MSC_VER) && !defined(__clang__)
 #  pragma section(".stdcmd", read, shared)
 #  define STDC_PLUGIN_METADATA_SECTION __declspec(allocate(".stdcmd"))
 #elif defined(_WIN32)
