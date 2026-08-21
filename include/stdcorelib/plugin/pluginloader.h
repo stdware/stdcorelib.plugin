@@ -35,8 +35,11 @@ namespace stdc::plugin {
     public:
         ~PluginLoader();
 
+        PluginLoader(PluginLoader &&RHS) noexcept;
+        PluginLoader &operator=(PluginLoader &&RHS) noexcept;
+
         enum State {
-            /// The manifest could not be read. Only \c location() and \c errorString() are
+            /// The manifest could not be read. Only \c location() and \c errorMessage() are
             /// meaningful.
             Invalid,
 
@@ -52,7 +55,7 @@ namespace stdc::plugin {
         bool hasError() const;
 
         /// Why this plugin is unusable, empty if it is not.
-        const std::string &errorString() const;
+        const std::string &errorMessage() const;
 
     public:
         /// The extension point this plugin plugs into, such as \c org.openvpi.InferenceInterpreter.
@@ -75,7 +78,7 @@ namespace stdc::plugin {
     public:
         /// Loads the library on first call, returning whether \c plugin() is now live.
         ///
-        /// \note Why it failed is on \c errorString(), which is where it has to be anyway for a
+        /// \note Why it failed is on \c errorMessage(), which is where it has to be anyway for a
         ///       plugin that is installed but unusable to be able to say so.
         bool load();
 
@@ -90,7 +93,8 @@ namespace stdc::plugin {
 
         friend class PluginFactory;
 
-        STDC_DISABLE_COPY_MOVE(PluginLoader)
+        PluginLoader(const PluginLoader &) = delete;
+        PluginLoader &operator=(const PluginLoader &) = delete;
     };
 
     /// @}

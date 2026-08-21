@@ -12,11 +12,8 @@ namespace stdc::plugin {
 
     class PluginLoader::Impl {
     public:
-        explicit Impl(PluginLoader *decl);
+        Impl();
         ~Impl();
-
-        using Decl = PluginLoader;
-        PluginLoader *_decl;
 
     public:
         /// Where the instance is meant to come from.
@@ -38,7 +35,7 @@ namespace stdc::plugin {
 
         PluginLoader::State state = PluginLoader::Invalid;
         bool hasError = false;
-        std::string errorString;
+        std::string errorMessage;
 
         std::string iid;
         std::filesystem::path location;

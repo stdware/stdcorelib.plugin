@@ -26,9 +26,8 @@ namespace stdc::plugin {
     PluginFactory::Impl::~Impl() = default;
 
     PluginLoader *PluginFactory::Impl::createLoader() {
-        auto loaderImpl = new PluginLoader::Impl(nullptr);
+        auto loaderImpl = new PluginLoader::Impl;
         auto loader = new PluginLoader(*loaderImpl);
-        loaderImpl->_decl = loader;
         return loader;
     }
 

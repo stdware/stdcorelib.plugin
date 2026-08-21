@@ -21,7 +21,7 @@ namespace stdc::plugin {
     /// rather than half understood.
     static constexpr const char *manifestVersion = "1.0";
 
-    PluginLoader::Impl::Impl(PluginLoader *decl) : _decl(decl) {
+    PluginLoader::Impl::Impl() {
     }
 
     PluginLoader::Impl::~Impl() {
@@ -31,7 +31,7 @@ namespace stdc::plugin {
     }
 
     bool PluginLoader::Impl::reportError(std::string err) {
-        errorString = std::move(err);
+        errorMessage = std::move(err);
         hasError = true;
         state = PluginLoader::Invalid;
         return false;
@@ -152,6 +152,10 @@ namespace stdc::plugin {
 
     PluginLoader::~PluginLoader() = default;
 
+    PluginLoader::PluginLoader(PluginLoader &&RHS) noexcept = default;
+
+    PluginLoader &PluginLoader::operator=(PluginLoader &&RHS) noexcept = default;
+
     PluginLoader::State PluginLoader::state() const {
         stdc_impl_t;
         return impl.state;
@@ -162,9 +166,9 @@ namespace stdc::plugin {
         return impl.hasError;
     }
 
-    const std::string &PluginLoader::errorString() const {
+    const std::string &PluginLoader::errorMessage() const {
         stdc_impl_t;
-        return impl.errorString;
+        return impl.errorMessage;
     }
 
     const std::string &PluginLoader::iid() const {

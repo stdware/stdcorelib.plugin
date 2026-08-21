@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <string>
+#include <type_traits>
 
 #include <stdcorelib/plugin/plugin.h>
 #include <stdcorelib/plugin/pluginfactory.h>
@@ -9,6 +10,11 @@
 #include <boost/test/unit_test.hpp>
 
 namespace {
+
+    static_assert(std::is_move_constructible_v<stdc::plugin::PluginLoader>);
+    static_assert(std::is_move_assignable_v<stdc::plugin::PluginLoader>);
+    static_assert(!std::is_copy_constructible_v<stdc::plugin::PluginLoader>);
+    static_assert(!std::is_copy_assignable_v<stdc::plugin::PluginLoader>);
 
     class TestStaticPlugin : public stdc::plugin::Plugin {};
 
