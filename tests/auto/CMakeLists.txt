@@ -46,17 +46,33 @@ stdc_add_plugin_metadata(test_pluginsystem_failing_plugin
     ${_pluginsystem_plugin_dir}/test_pluginsystem_plugin.json
 )
 
+foreach(_name IN ITEMS provider consumer)
+    set(_target test_pluginsystem_lifecycle_${_name})
+    add_library(${_target} MODULE
+        ${_pluginsystem_plugin_dir}/test_pluginsystem_lifecycle_plugin.cpp
+    )
+    target_link_libraries(${_target} PRIVATE stdcorelib::plugin)
+    target_compile_definitions(${_target} PRIVATE
+        TEST_PLUGINSYSTEM_LIFECYCLE_NAME="${_name}"
+    )
+    set_target_properties(${_target} PROPERTIES PREFIX "")
+endforeach()
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     TEST_PLUGINLOADER_PLUGIN_PATH="$<TARGET_FILE:test_pluginloader_plugin>"
     TEST_PLUGINLOADER_LIBRARY_PATH="$<TARGET_FILE:test_pluginloader_library>"
     TEST_PLUGINLOADER_METADATA_PATH="${_plugin_dir}/test_pluginloader_plugin.json"
     TEST_PLUGINSYSTEM_FAILING_PLUGIN_PATH="$<TARGET_FILE:test_pluginsystem_failing_plugin>"
+    TEST_PLUGINSYSTEM_LIFECYCLE_CONSUMER_PATH="$<TARGET_FILE:test_pluginsystem_lifecycle_consumer>"
+    TEST_PLUGINSYSTEM_LIFECYCLE_PROVIDER_PATH="$<TARGET_FILE:test_pluginsystem_lifecycle_provider>"
     TEST_PLUGINSYSTEM_PLUGIN_PATH="$<TARGET_FILE:test_pluginsystem_plugin>"
 )
 add_dependencies(${PROJECT_NAME}
     test_pluginloader_library
     test_pluginloader_plugin
     test_pluginsystem_failing_plugin
+    test_pluginsystem_lifecycle_consumer
+    test_pluginsystem_lifecycle_provider
     test_pluginsystem_plugin
 )
 

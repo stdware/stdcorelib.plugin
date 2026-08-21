@@ -2,6 +2,7 @@
 
 #include <stdcorelib/pluginsystem/plugindependency.h>
 #include <stdcorelib/pluginsystem/pluginsystem.h>
+#include <stdcorelib/support/sharedlibrary.h>
 
 #include <algorithm>
 #include <chrono>
@@ -39,16 +40,19 @@ namespace {
             std::filesystem::remove_all(_path, ec);
         }
 
-        void addPlugin(const std::string &directoryName, std::string_view metadata,
-                       const std::filesystem::path &source = TEST_PLUGINSYSTEM_PLUGIN_PATH,
-                       std::string_view iid = "org.stdcorelib.PluginSystem") {
+        std::filesystem::path
+            addPlugin(const std::string &directoryName, std::string_view metadata,
+                      const std::filesystem::path &source = TEST_PLUGINSYSTEM_PLUGIN_PATH,
+                      std::string_view iid = "org.stdcorelib.PluginSystem") {
             const auto pluginDirectory = _path / directoryName;
             std::filesystem::create_directories(pluginDirectory);
-            std::filesystem::copy_file(source, pluginDirectory / source.filename());
+            const auto pluginPath = pluginDirectory / source.filename();
+            std::filesystem::copy_file(source, pluginPath);
 
             std::ofstream manifest(pluginDirectory / "plugin.json");
             manifest << R"({"iid":")" << iid << R"(","binary":")" << source.filename().string()
                      << R"(","metadata":)" << metadata << "}";
+            return pluginPath;
         }
 
         const std::filesystem::path &path() const {
@@ -65,6 +69,27 @@ namespace {
         auto it = std::find_if(specs.begin(), specs.end(),
                                [id](const auto spec) { return spec->id() == id; });
         return it == specs.end() ? nullptr : *it;
+    }
+
+    std::vector<std::string> lifecycleEvents;
+    stdc::pluginsystem::PluginSystem *activePluginSystem = nullptr;
+
+    void recordLifecycleEvent(const char *plugin, const char *event) {
+        lifecycleEvents.push_back(std::string(plugin) + "." + event);
+        if (activePluginSystem) {
+            activePluginSystem->plugins();
+            activePluginSystem->hasError();
+        }
+    }
+
+    void setLifecycleCallback(stdc::SharedLibrary *library,
+                              const std::filesystem::path &pluginPath) {
+        BOOST_REQUIRE_MESSAGE(library->open(pluginPath), library->errorMessage());
+        using SetCallback = void (*)(void (*)(const char *, const char *));
+        auto setter =
+            reinterpret_cast<SetCallback>(library->resolve("test_pluginsystem_set_event_callback"));
+        BOOST_REQUIRE_MESSAGE(setter, library->errorMessage());
+        setter(&recordLifecycleEvent);
     }
 
     void checkPluginSystemLayout(stdc::pluginsystem::PluginSystem::PluginLayout layout) {
@@ -251,6 +276,42 @@ BOOST_AUTO_TEST_CASE(test_disabled_dependencies) {
     BOOST_CHECK_EQUAL(required->state(), stdc::pluginsystem::PluginSpec::Invalid);
     BOOST_CHECK(required->errorMessage().find("disabled") != std::string::npos);
     BOOST_CHECK_EQUAL(optional->state(), stdc::pluginsystem::PluginSpec::Running);
+}
+
+BOOST_AUTO_TEST_CASE(test_lifecycle_dependency_order_and_reentrant_queries) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    const auto providerPath =
+        directory.addPlugin("provider", R"({"id":"Provider","name":"Provider","version":"1.0"})",
+                            TEST_PLUGINSYSTEM_LIFECYCLE_PROVIDER_PATH);
+    const auto consumerPath = directory.addPlugin(
+        "consumer",
+        R"({"id":"Consumer","name":"Consumer","version":"1.0","dependencies":[{"id":"Provider","version":"1.0","type":"required"}]})",
+        TEST_PLUGINSYSTEM_LIFECYCLE_CONSUMER_PATH);
+
+    stdc::SharedLibrary providerLibrary;
+    stdc::SharedLibrary consumerLibrary;
+    setLifecycleCallback(&providerLibrary, providerPath);
+    setLifecycleCallback(&consumerLibrary, consumerPath);
+
+    stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
+                                            stdc::pluginsystem::PluginSystem::Directory);
+    system.setPluginPaths(directory.path());
+    lifecycleEvents.clear();
+    activePluginSystem = &system;
+    system.loadPlugins();
+    system.shutdownPlugins();
+    activePluginSystem = nullptr;
+
+    const std::vector<std::string> expected{
+        "provider.initialize",        "consumer.initialize",      "consumer.pluginInitialized",
+        "provider.pluginInitialized", "consumer.aboutToShutdown", "provider.aboutToShutdown",
+    };
+    BOOST_CHECK_EQUAL_COLLECTIONS(lifecycleEvents.begin(), lifecycleEvents.end(), expected.begin(),
+                                  expected.end());
+
+    for (auto spec : system.plugins()) {
+        BOOST_CHECK_EQUAL(spec->state(), stdc::pluginsystem::PluginSpec::Stopped);
+    }
 }
 
 BOOST_AUTO_TEST_CASE(test_required_and_optional_dependencies) {
