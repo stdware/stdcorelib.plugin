@@ -92,7 +92,9 @@ namespace stdc::pluginsystem {
         resolvedDependencies.clear();
         loadOrder.clear();
 
-        std::map<std::string, std::vector<PluginSpecData *>, std::less<>> dataById;
+        // Two inline entries detect the only interesting duplicate-ID case without a separate
+        // buffer allocation.
+        std::map<std::string, vlarray<PluginSpecData *, 2>, std::less<>> dataById;
         for (auto &item : pluginData) {
             auto &data = item.second;
             if (!data.id.empty()) {
@@ -151,7 +153,8 @@ namespace stdc::pluginsystem {
             Visited,
         };
         std::map<PluginSpecData *, VisitState> visitStates;
-        std::vector<PluginSpecData *> stack;
+        // Dependency chains are normally shallow; sixteen pointers keep recursive DFS off-heap.
+        vlarray<PluginSpecData *, 16> stack;
         std::map<PluginSpecData *, std::string> cycleErrors;
         std::function<void(PluginSpecData *)> findCycles = [&](PluginSpecData *data) {
             visitStates[data] = VisitState::Visiting;

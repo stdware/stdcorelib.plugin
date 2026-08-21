@@ -8,6 +8,7 @@
 #include <shared_mutex>
 
 #include <stdcorelib/adt/linked_map.h>
+#include <stdcorelib/adt/vlarray.h>
 #include <stdcorelib/pimpl.h>
 
 #include <stdcorelib/plugin/pluginfactory.h>
@@ -24,6 +25,12 @@ namespace stdc::pluginsystem {
             PluginSpecData *data;
         };
 
+        /// Four direct dependencies cover the common case without making every map node large.
+        using ResolvedDependencies = vlarray<ResolvedDependency, 4>;
+
+        /// Most applications load fewer than 32 plugins; larger sets spill to dynamic storage.
+        using PluginOrder = vlarray<PluginSpecData *, 32>;
+
         Impl(std::string pluginIID, PluginLayout pluginLayout);
 
         std::string iid;
@@ -34,8 +41,8 @@ namespace stdc::pluginsystem {
         mutable std::shared_mutex configMtx;
         bool loadStarted = false;
 
-        std::map<PluginSpecData *, std::vector<ResolvedDependency>> resolvedDependencies;
-        std::vector<PluginSpecData *> loadOrder;
+        std::map<PluginSpecData *, ResolvedDependencies> resolvedDependencies;
+        PluginOrder loadOrder;
 
         void resolveDependencies();
         bool requiredDependenciesAtState(PluginSpecData *data, PluginSpec::State state,
