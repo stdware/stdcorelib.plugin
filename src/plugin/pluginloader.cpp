@@ -16,12 +16,6 @@ namespace fs = std::filesystem;
 
 namespace stdc::plugin {
 
-    /// The manifest format this build understands.
-    ///
-    /// Read before anything else, so that a manifest written for a later version is turned away
-    /// rather than half understood.
-    static constexpr const char *manifestVersion = "1.0";
-
     PluginLoader::Impl::Impl() {
     }
 
@@ -105,15 +99,6 @@ namespace stdc::plugin {
             *out = it->second.toString();
             return !out->empty();
         };
-
-        std::string_view version;
-        if (!stringField("$version", &version)) {
-            return reportError(formatN(R"(%1: missing or invalid "$version" field)", sourcePath));
-        }
-        if (version != manifestVersion) {
-            return reportError(
-                formatN(R"(%1: unsupported manifest version "%2")", sourcePath, version));
-        }
 
         std::string_view iid_;
         if (!stringField("iid", &iid_)) {

@@ -30,7 +30,6 @@ namespace {
 
 STDC_EXPORT_STATIC_PLUGIN(TestStaticPlugin, "test",
                           (stdc::json::Object{
-                              {"$version", "1.0"                },
                               {"iid",      "org.stdcorelib.Test"},
                               {"metadata", stdc::json::Object() },
 }))

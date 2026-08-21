@@ -47,8 +47,8 @@ namespace {
             std::filesystem::copy_file(source, pluginDirectory / source.filename());
 
             std::ofstream manifest(pluginDirectory / "plugin.json");
-            manifest << R"({"$version":"1.0","iid":")" << iid << R"(","binary":")"
-                     << source.filename().string() << R"(","metadata":)" << metadata << "}";
+            manifest << R"({"iid":")" << iid << R"(","binary":")" << source.filename().string()
+                     << R"(","metadata":)" << metadata << "}";
         }
 
         const std::filesystem::path &path() const {

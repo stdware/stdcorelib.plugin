@@ -112,7 +112,7 @@ namespace stdc::plugin {
         /// The shared library, or empty for a static or runtime plugin.
         const std::filesystem::path &filePath() const;
 
-        /// The complete metadata manifest, including \c $version, \c iid, and \c metadata.
+        /// The complete metadata manifest, including \c iid and \c metadata.
         const json::Value &metadata() const;
 
     public:
