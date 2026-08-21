@@ -113,7 +113,11 @@ namespace stdc::plugin {
         ///       plugin that is installed but unusable to be able to say so.
         bool load();
 
-        /// Unloads the library, invalidating the pointer returned by \c plugin().
+        /// Unloads a filesystem plugin, invalidating the pointer returned by \c plugin().
+        ///
+        /// Returns true if the plugin is already unloaded. A loaded static or runtime plugin
+        /// cannot be unloaded because its lifetime is not controlled by this loader, so calling
+        /// this function on one returns false.
         bool unload();
 
         bool isLoaded() const;

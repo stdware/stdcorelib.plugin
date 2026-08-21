@@ -229,8 +229,11 @@ namespace stdc::plugin {
     }
 
     bool PluginLoader::Impl::unloadLibrary() {
-        if (state != PluginLoader::Loaded || origin != PluginLoader::FileSystem) {
-            return state != PluginLoader::Loaded;
+        if (state != PluginLoader::Loaded) {
+            return true;
+        }
+        if (origin != PluginLoader::FileSystem) {
+            return false;
         }
         if (!library->close()) {
             errorMessage = library->errorMessage();
