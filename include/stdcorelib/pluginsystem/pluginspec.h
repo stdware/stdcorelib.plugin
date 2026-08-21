@@ -13,6 +13,7 @@
 
 namespace stdc::pluginsystem {
 
+    class IPlugin;
     class PluginSpecData;
 
     /// Describes one plugin discovered by a PluginSystem.
@@ -58,6 +59,12 @@ namespace stdc::pluginsystem {
 
         /// The plugin shared library path.
         const std::filesystem::path &filePath() const;
+
+        /// Returns the loaded plugin instance, or null before loading and after unloading.
+        ///
+        /// The PluginLoader owns this instance. The pointer remains valid at least until
+        /// shutdownPlugins() unloads its library.
+        IPlugin *plugin() const;
 
     private:
         explicit PluginSpec(PluginSpecData *data);

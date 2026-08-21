@@ -87,6 +87,8 @@ for (const auto *spec : plugins.plugins()) {
 plugins.shutdownPlugins();
 ```
 
+After a spec reaches the loaded lifecycle states, `PluginSpec::plugin()` returns its non-owning `IPlugin` pointer. Hosts can cast it to the IID-specific application interface; successful shutdown clears the pointer as the library is unloaded.
+
 Loading and initialization follow dependency order. `pluginInitialized()` and `aboutToShutdown()` run in reverse dependency order. Shutdown unloads the libraries, repeated lifecycle calls have no effect, and the `PluginSystem` destructor performs shutdown when the host does not call it explicitly.
 
 ## Enabled-state settings

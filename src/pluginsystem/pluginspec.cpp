@@ -173,4 +173,8 @@ namespace stdc::pluginsystem {
         return _data->loader->filePath();
     }
 
+    IPlugin *PluginSpec::plugin() const {
+        return _data->plugin;
+    }
+
 }

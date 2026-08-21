@@ -103,6 +103,7 @@ namespace {
 
         const auto specs = system.plugins();
         BOOST_REQUIRE_EQUAL(specs.size(), 1u);
+        BOOST_CHECK(!specs.front()->plugin());
         BOOST_CHECK_EQUAL(specs.front()->state(), stdc::pluginsystem::PluginSpec::Read);
         BOOST_CHECK(!specs.front()->hasError());
         BOOST_CHECK_EQUAL(specs.front()->id(), "org.stdcorelib.PluginSystemTest");
@@ -120,6 +121,7 @@ namespace {
         const auto pathsBeforeLoad = system.pluginPaths();
         system.loadPlugins();
         BOOST_CHECK_EQUAL(specs.front()->state(), stdc::pluginsystem::PluginSpec::Running);
+        BOOST_CHECK(specs.front()->plugin());
         BOOST_CHECK(!system.hasError());
 
         const std::vector<std::filesystem::path> noPaths;
@@ -136,6 +138,7 @@ namespace {
 
         system.shutdownPlugins();
         BOOST_CHECK_EQUAL(specs.front()->state(), stdc::pluginsystem::PluginSpec::Stopped);
+        BOOST_CHECK(!specs.front()->plugin());
         system.shutdownPlugins();
         BOOST_CHECK_EQUAL(specs.front()->state(), stdc::pluginsystem::PluginSpec::Stopped);
     }
