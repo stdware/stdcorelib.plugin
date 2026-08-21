@@ -47,24 +47,6 @@ namespace stdc::plugin {
         return false;
     }
 
-    bool PluginLoader::Impl::read(const std::filesystem::path &manifestPath) {
-        reset();
-        std::ifstream file(manifestPath);
-        if (!file.is_open()) {
-            return reportError(formatN(R"(failed to open "%1")", manifestPath));
-        }
-
-        std::stringstream ss;
-        ss << file.rdbuf();
-
-        json::ParseError parseError;
-        auto root = json::Value::fromJson(ss.str(), true, &parseError);
-        if (parseError) {
-            return reportError(formatN(R"(%1: %2)", manifestPath, parseError.message()));
-        }
-        return readMetadata(root, manifestPath);
-    }
-
     bool PluginLoader::Impl::readLibrary(const std::filesystem::path &libraryPath,
                                          const std::optional<std::filesystem::path> &metadataPath) {
         reset();
@@ -190,11 +172,11 @@ namespace stdc::plugin {
         if (!runtimeIid.isString() || runtimeIid.toString().empty()) {
             return reportError("runtime plugin declares no iid");
         }
+        iid = runtimeIid.toString();
         if (!runtimePlugin) {
             return reportError("runtime plugin instance is null");
         }
 
-        iid = runtimeIid.toString();
         plugin = runtimePlugin;
         state = PluginLoader::Loaded;
         return true;

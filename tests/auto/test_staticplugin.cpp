@@ -24,6 +24,8 @@ namespace {
 
     class TestStaticPlugin : public stdc::plugin::Plugin {};
 
+    class InvalidStaticPlugin : public stdc::plugin::Plugin {};
+
 }
 
 STDC_EXPORT_STATIC_PLUGIN(TestStaticPlugin, "test",
@@ -32,6 +34,8 @@ STDC_EXPORT_STATIC_PLUGIN(TestStaticPlugin, "test",
                               {"iid",      "org.stdcorelib.Test"},
                               {"metadata", stdc::json::Object() },
 }))
+
+STDC_EXPORT_STATIC_PLUGIN(InvalidStaticPlugin, "invalid", (stdc::json::Object{}))
 
 BOOST_AUTO_TEST_SUITE(test_staticplugin)
 
@@ -66,6 +70,13 @@ BOOST_AUTO_TEST_CASE(test_loader_origin) {
     const auto plugins = factory.plugins("org.stdcorelib.Test");
     BOOST_REQUIRE_EQUAL(plugins.size(), 1u);
     BOOST_CHECK_EQUAL(plugins.front()->origin(), stdc::plugin::PluginLoader::Static);
+}
+
+BOOST_AUTO_TEST_CASE(test_factory_ignores_static_plugin_without_iid) {
+    stdc::plugin::PluginFactory factory;
+    factory.addStaticPlugins("invalid");
+
+    BOOST_CHECK(factory.plugins("").empty());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

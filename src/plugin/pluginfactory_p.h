@@ -27,7 +27,7 @@ namespace stdc::plugin {
         ///
         /// Scanning only ever adds. A loader that exists may have been handed out and may have been
         /// loaded, so rescanning must not take it away.
-        void scanPlugins(std::string_view iid) const;
+        void scanPlugins(const PluginFactory &factory, std::string_view iid) const;
 
         std::map<std::string, vlarray<std::filesystem::path>, std::less<>> pluginPaths;
 
@@ -35,8 +35,8 @@ namespace stdc::plugin {
         /// what lets \c plugins() hand out bare pointers.
         mutable std::map<std::string, vlarray<std::unique_ptr<PluginLoader>>, std::less<>> loaders;
 
-        /// Manifests already turned into a loader, so that a rescan skips them.
-        mutable std::set<std::filesystem::path::string_type> readManifests;
+        /// Plugin files already turned into a loader, so that a rescan skips them.
+        mutable std::set<std::filesystem::path::string_type> readPluginFiles;
 
         mutable std::set<std::string, std::less<>> pluginsDirty;
         mutable std::shared_mutex plugins_mtx;

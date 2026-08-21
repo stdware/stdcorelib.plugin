@@ -34,11 +34,6 @@ namespace stdc::plugin {
         std::optional<SharedLibrary> library;
 
     public:
-        /// Reads \a manifestPath and fills everything but the instance.
-        ///
-        /// Failure is recorded rather than thrown away, so that a plugin which is installed but
-        /// unusable still shows up with a reason attached.
-        bool read(const std::filesystem::path &manifestPath);
         bool readLibrary(const std::filesystem::path &libraryPath,
                          const std::optional<std::filesystem::path> &metadataPath = {});
         bool readMetadata(const json::Value &root, const std::filesystem::path &sourcePath,

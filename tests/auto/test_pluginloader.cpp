@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+#include <stdcorelib/plugin/pluginfactory.h>
 #include <stdcorelib/plugin/pluginloader.h>
 
 #include <boost/test/unit_test.hpp>
@@ -7,6 +8,22 @@
 namespace {
 
     class RuntimePlugin : public stdc::plugin::Plugin {};
+
+    class TestPluginFactory : public stdc::plugin::PluginFactory {
+    protected:
+        bool scanPluginPaths(const std::filesystem::path &,
+                             std::vector<std::filesystem::path> *pluginPaths) const override {
+            pluginPaths->push_back("candidate");
+            return true;
+        }
+
+        bool resolvePluginPath(const std::filesystem::path &, std::filesystem::path *pluginPath,
+                               std::optional<std::filesystem::path> *metadataPath) const override {
+            *pluginPath = TEST_PLUGINLOADER_PLUGIN_PATH;
+            *metadataPath = TEST_PLUGINLOADER_METADATA_PATH;
+            return true;
+        }
+    };
 
 }
 
@@ -74,6 +91,28 @@ BOOST_AUTO_TEST_CASE(test_load_failed) {
     BOOST_CHECK(!loader.load());
     BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::LoadFailed);
     BOOST_CHECK(loader.hasError());
+}
+
+BOOST_AUTO_TEST_CASE(test_factory_scan_hooks) {
+    const auto root = std::filesystem::path(TEST_PLUGINLOADER_METADATA_PATH).parent_path();
+
+    TestPluginFactory factory;
+    factory.addPluginPath("org.stdcorelib.LoaderTest", root);
+    const auto plugins = factory.plugins("org.stdcorelib.LoaderTest");
+    BOOST_REQUIRE_EQUAL(plugins.size(), 1u);
+    BOOST_CHECK_EQUAL(plugins.front()->filePath(), TEST_PLUGINLOADER_PLUGIN_PATH);
+
+    TestPluginFactory mismatchedFactory;
+    mismatchedFactory.addPluginPath("org.stdcorelib.Other", root);
+    BOOST_CHECK(mismatchedFactory.plugins("org.stdcorelib.Other").empty());
+}
+
+BOOST_AUTO_TEST_CASE(test_factory_ignores_runtime_plugin_without_iid) {
+    RuntimePlugin plugin;
+    stdc::plugin::PluginFactory factory;
+    factory.addRuntimePlugin(&plugin, stdc::json::Object());
+
+    BOOST_CHECK(factory.plugins("").empty());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

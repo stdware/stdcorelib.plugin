@@ -2,13 +2,14 @@
 
 #include "pluginfactory.h"
 #include "pluginfactory_p.h"
-#include "pluginloader_p.h"
 
+#include <fstream>
 #include <mutex>
+#include <sstream>
 #include <utility>
 
+#include <stdcorelib/path.h>
 #include <stdcorelib/pimpl.h>
-#include <stdcorelib/str.h>
 
 namespace fs = std::filesystem;
 
@@ -28,7 +29,8 @@ namespace stdc::plugin {
         return std::make_unique<PluginLoader>();
     }
 
-    void PluginFactory::Impl::scanPlugins(std::string_view iid) const {
+    void PluginFactory::Impl::scanPlugins(const PluginFactory &factory,
+                                          std::string_view iid) const {
         auto it = pluginPaths.find(iid);
         if (it == pluginPaths.end()) {
             if (auto dirty = pluginsDirty.find(iid); dirty != pluginsDirty.end()) {
@@ -39,41 +41,27 @@ namespace stdc::plugin {
 
         auto &known = loaders[std::string(iid)];
         for (const auto &root : it->second) {
-            std::error_code ec;
-            fs::directory_iterator dir(root, ec);
-            if (ec) {
+            std::vector<std::filesystem::path> candidates;
+            if (!factory.scanPluginPaths(root, &candidates)) {
                 continue;
             }
-
-            // One directory per plugin, holding the manifest and whatever else the plugin needs
-            // beside it. A directory without a manifest is not ours to complain about.
-            for (const auto &entry : dir) {
-                if (!entry.is_directory()) {
-                    continue;
-                }
-
-                auto manifest = entry.path() / manifestName;
-                if (!fs::is_regular_file(manifest)) {
-                    continue;
-                }
-
-                auto canonical = fs::canonical(manifest, ec);
-                if (ec) {
-                    continue;
-                }
-                if (!readManifests.insert(canonical.native()).second) {
+            for (const auto &candidate : candidates) {
+                std::filesystem::path pluginPath;
+                std::optional<std::filesystem::path> metadataPath;
+                if (!factory.resolvePluginPath(candidate, &pluginPath, &metadataPath)) {
                     continue;
                 }
 
                 auto loader = createLoader();
-                auto &loaderImpl = *loader->_impl;
-                if (loaderImpl.read(canonical) && loaderImpl.iid != iid) {
-                    // The directory it was found in says one extension point and the manifest
-                    // says another. Keep it where it was found so that whoever looks there is
-                    // told, rather than filing it where nobody is looking.
-                    loaderImpl.reportError(formatN(
-                        R"("%1" declares iid "%2", which is not the "%3" it was found under)",
-                        canonical, loaderImpl.iid, iid));
+                loader->setFilePath(pluginPath, metadataPath);
+                if (loader->iid() != iid) {
+                    continue;
+                }
+
+                std::error_code ec;
+                auto canonical = fs::canonical(pluginPath, ec);
+                if (!ec && !readPluginFiles.insert(canonical.native()).second) {
+                    continue;
                 }
                 known.emplace_back(std::move(loader));
             }
@@ -96,12 +84,57 @@ namespace stdc::plugin {
 
     PluginFactory &PluginFactory::operator=(PluginFactory &&RHS) noexcept = default;
 
+    bool PluginFactory::scanPluginPaths(const std::filesystem::path &path,
+                                        std::vector<std::filesystem::path> *pluginPaths) const {
+        std::error_code ec;
+        fs::directory_iterator dir(path, ec);
+        if (ec) {
+            return false;
+        }
+        for (const auto &entry : dir) {
+            if (entry.is_directory()) {
+                pluginPaths->push_back(entry.path());
+            }
+        }
+        return true;
+    }
+
+    bool
+        PluginFactory::resolvePluginPath(const std::filesystem::path &path,
+                                         std::filesystem::path *pluginPath,
+                                         std::optional<std::filesystem::path> *metadataPath) const {
+        auto manifest = path / manifestName;
+        std::ifstream file(manifest);
+        if (!file.is_open()) {
+            return false;
+        }
+
+        std::stringstream ss;
+        ss << file.rdbuf();
+        json::ParseError parseError;
+        auto root = json::Value::fromJson(ss.str(), true, &parseError);
+        if (parseError || !root.isObject()) {
+            return false;
+        }
+
+        auto binary = root["binary"];
+        if (!binary.isString() || binary.toString().empty()) {
+            return false;
+        }
+        *pluginPath = path / stdc::path::from_utf8(binary.toString());
+        *metadataPath = std::move(manifest);
+        return true;
+    }
+
     void PluginFactory::addStaticPlugins(std::string_view pluginSet) {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
         for (const StaticPlugin &plugin : PluginLoader::staticPlugins(pluginSet)) {
             auto loader = std::make_unique<PluginLoader>(plugin);
+            if (loader->iid().empty()) {
+                continue;
+            }
             impl.loaders[loader->iid()].emplace_back(std::move(loader));
         }
     }
@@ -111,6 +144,9 @@ namespace stdc::plugin {
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
         auto loader = std::make_unique<PluginLoader>(plugin, metadata);
+        if (loader->iid().empty()) {
+            return;
+        }
         impl.loaders[loader->iid()].emplace_back(std::move(loader));
     }
 
@@ -162,7 +198,7 @@ namespace stdc::plugin {
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
         if (impl.pluginsDirty.count(iid)) {
-            impl.scanPlugins(iid);
+            impl.scanPlugins(*this, iid);
         }
 
         auto it = impl.loaders.find(iid);

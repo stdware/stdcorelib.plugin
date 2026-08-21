@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -65,10 +66,31 @@ namespace stdc::plugin {
         /// Everything found for \a iid, scanning the registered directories if they have not been
         /// scanned since they last changed.
         ///
-        /// Nothing is loaded. Loaders for plugins that could not be read are returned along with
-        /// the rest, carrying the reason, so that a caller which finds no match can say whether
-        /// the plugin it wanted is missing or merely broken.
+        /// Nothing is loaded. A candidate without the requested \c iid is ignored. Once its IID
+        /// has been read, later errors stay on its loader so the caller can report why that plugin
+        /// is unusable.
         std::vector<PluginLoader *> plugins(std::string_view iid) const;
+
+    protected:
+        /// Finds candidate plugin paths under a registered search directory.
+        ///
+        /// \param path The directory registered with \c addPluginPath().
+        /// \param pluginPaths Receives the candidate paths to resolve.
+        /// \return Whether the directory was scanned successfully.
+        virtual bool scanPluginPaths(const std::filesystem::path &path,
+                                     std::vector<std::filesystem::path> *pluginPaths) const;
+
+        /// Resolves a candidate into the paths passed to \c PluginLoader::setFilePath().
+        ///
+        /// An empty \a metadataPath makes the loader read embedded metadata.
+        ///
+        /// \param path A candidate returned by \c scanPluginPaths().
+        /// \param pluginPath Receives the plugin library path.
+        /// \param metadataPath Receives an optional external metadata JSON path.
+        /// \return Whether the candidate was resolved successfully.
+        virtual bool resolvePluginPath(const std::filesystem::path &path,
+                                       std::filesystem::path *pluginPath,
+                                       std::optional<std::filesystem::path> *metadataPath) const;
 
     protected:
         class Impl;
