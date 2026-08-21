@@ -5,8 +5,10 @@
 #include <stdcorelib/support/sharedlibrary.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <fstream>
+#include <thread>
 
 #include <boost/test/unit_test.hpp>
 
@@ -158,6 +160,39 @@ BOOST_AUTO_TEST_CASE(test_flat_layout) {
 
 BOOST_AUTO_TEST_CASE(test_directory_layout) {
     checkPluginSystemLayout(stdc::pluginsystem::PluginSystem::Directory);
+}
+
+BOOST_AUTO_TEST_CASE(test_concurrent_frozen_queries) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory);
+    stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
+                                            stdc::pluginsystem::PluginSystem::Directory);
+    system.setPluginPaths(directory.path());
+    system.loadPlugins();
+
+    std::atomic<int> readyThreads = 0;
+    std::atomic<bool> start = false;
+    std::vector<std::thread> threads;
+    for (int i = 0; i < 4; ++i) {
+        threads.emplace_back([&] {
+            ++readyThreads;
+            while (!start) {
+                std::this_thread::yield();
+            }
+            for (int j = 0; j < 50; ++j) {
+                system.plugins();
+                system.hasError();
+            }
+        });
+    }
+    while (readyThreads != 4) {
+        std::this_thread::yield();
+    }
+    start = true;
+    for (auto &thread : threads) {
+        thread.join();
+    }
+
+    BOOST_CHECK_EQUAL(system.plugins().front()->state(), stdc::pluginsystem::PluginSpec::Running);
 }
 
 BOOST_AUTO_TEST_CASE(test_spec_address_survives_discovery_growth) {

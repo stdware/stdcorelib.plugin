@@ -281,12 +281,13 @@ namespace stdc::pluginsystem {
         std::vector<plugin::PluginLoader *> loaders;
         if (scan) {
             loaders = factory->plugins(iid);
+            for (auto loader : loaders) {
+                pluginData.try_emplace(loader, *loader);
+            }
+            // Scanning is always performed under configMtx exclusively. Do not rewrite enabled
+            // states on the shared-lock query path after the plugin snapshot has frozen.
+            applySettings();
         }
-
-        for (auto loader : loaders) {
-            pluginData.try_emplace(loader, *loader);
-        }
-        applySettings();
 
         std::vector<PluginSpec *> result;
         result.reserve(pluginData.size());
