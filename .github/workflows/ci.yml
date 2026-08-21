@@ -87,7 +87,12 @@ jobs:
         run: cmake --build build
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure --no-tests=error
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            export PATH="$(cygpath -u "$RUNNER_TEMP")/stdcorelib/bin:$PATH"
+          fi
+          ctest --test-dir build --output-on-failure --no-tests=error
 
       - name: Install
         run: cmake --install build --prefix "${{ runner.temp }}/stdcorelib-plugin"
@@ -156,7 +161,12 @@ jobs:
         run: cmake --build build
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure --no-tests=error
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            export PATH="$(cygpath -u "$RUNNER_TEMP")/stdcorelib/bin:$PATH"
+          fi
+          ctest --test-dir build --output-on-failure --no-tests=error
 
   # The Windows implementation against the GNU Windows headers and linker. This is separate
   # from clang-cl: both emit PE files, but expose different compatibility edges.

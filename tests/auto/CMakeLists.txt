@@ -42,3 +42,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 add_test(NAME ${PROJECT_NAME} COMMAND ${PROJECT_NAME})
+
+# A normal run takes a fraction of a second. The default 1500-second timeout turns a missing
+# runtime DLL or a deadlock into a CI job that appears to run forever.
+set_tests_properties(${PROJECT_NAME} PROPERTIES TIMEOUT 120)
