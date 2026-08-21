@@ -11,23 +11,24 @@ if(NOT Boost_FOUND)
 endif()
 
 file(GLOB _src *.cpp)
-list(REMOVE_ITEM _src ${CMAKE_CURRENT_SOURCE_DIR}/pluginloader_test_plugin.cpp)
 add_executable(${PROJECT_NAME} ${_src})
 
-add_library(pluginloader_test_plugin MODULE pluginloader_test_plugin.cpp)
+set(_plugin_dir ${CMAKE_CURRENT_SOURCE_DIR}/plugins/pluginloader_test_plugin)
+
+add_library(pluginloader_test_plugin MODULE ${_plugin_dir}/pluginloader_test_plugin.cpp)
 target_link_libraries(pluginloader_test_plugin PRIVATE stdcorelib::plugin)
 set_target_properties(pluginloader_test_plugin PROPERTIES PREFIX "")
 
 if(WIN32)
-    target_sources(pluginloader_test_plugin PRIVATE pluginloader_test_plugin.rc)
-    set_property(SOURCE pluginloader_test_plugin.rc PROPERTY OBJECT_DEPENDS
-        ${CMAKE_CURRENT_SOURCE_DIR}/pluginloader_test_plugin.json
+    target_sources(pluginloader_test_plugin PRIVATE ${_plugin_dir}/pluginloader_test_plugin.rc)
+    set_property(SOURCE ${_plugin_dir}/pluginloader_test_plugin.rc PROPERTY OBJECT_DEPENDS
+        ${_plugin_dir}/pluginloader_test_plugin.json
     )
 endif()
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     TEST_PLUGINLOADER_PLUGIN_PATH="$<TARGET_FILE:pluginloader_test_plugin>"
-    TEST_PLUGINLOADER_METADATA_PATH="${CMAKE_CURRENT_SOURCE_DIR}/pluginloader_test_plugin.json"
+    TEST_PLUGINLOADER_METADATA_PATH="${_plugin_dir}/pluginloader_test_plugin.json"
 )
 add_dependencies(${PROJECT_NAME} pluginloader_test_plugin)
 
