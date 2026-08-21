@@ -2,7 +2,6 @@
 
 #include "pluginloader.h"
 #include "pluginloader_p.h"
-#include "pluginmetadata_p.h"
 
 #include <fstream>
 #include <sstream>
@@ -87,7 +86,7 @@ namespace stdc::plugin {
             sourcePath = overridePath;
         } else {
             std::string readError;
-            if (!read_embedded_metadata(filePath, &text, &readError)) {
+            if (!readEmbeddedMetadata(filePath, &text, &readError)) {
                 return reportError(formatN(R"(%1: %2)", filePath, readError));
             }
         }

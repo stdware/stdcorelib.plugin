@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-#include "pluginmetadata_p.h"
+#include "pluginloader_p.h"
 
 #include <cstring>
 #include <elf.h>
@@ -53,8 +53,8 @@ namespace stdc::plugin {
         return false;
     }
 
-    bool read_embedded_metadata(const fs::path &filePath, std::string *metadata,
-                                std::string *errorMessage) {
+    bool PluginLoader::Impl::readEmbeddedMetadata(const fs::path &filePath, std::string *metadata,
+                                                  std::string *errorMessage) {
         std::ifstream file(filePath, std::ios::binary);
         unsigned char identity[EI_NIDENT]{};
         file.read(reinterpret_cast<char *>(identity), sizeof(identity));

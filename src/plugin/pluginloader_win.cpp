@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-#include "pluginmetadata_p.h"
+#include "pluginloader_p.h"
 
 #include <stdcorelib/platform/windows/stdc_windows.h>
 
@@ -8,8 +8,8 @@ namespace fs = std::filesystem;
 
 namespace stdc::plugin {
 
-    bool read_embedded_metadata(const fs::path &filePath, std::string *metadata,
-                                std::string *errorMessage) {
+    bool PluginLoader::Impl::readEmbeddedMetadata(const fs::path &filePath, std::string *metadata,
+                                                  std::string *errorMessage) {
         auto module =
             ::LoadLibraryExW(filePath.c_str(), nullptr,
                              LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE);

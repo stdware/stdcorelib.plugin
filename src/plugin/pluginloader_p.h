@@ -57,6 +57,9 @@ namespace stdc::plugin {
         bool readMetadata(const json::Value &root, const std::filesystem::path &sourcePath,
                           const std::filesystem::path &boundFilePath = {});
 
+        static bool readEmbeddedMetadata(const std::filesystem::path &filePath,
+                                         std::string *metadata, std::string *errorMessage);
+
         void reset();
 
         bool loadLibrary();

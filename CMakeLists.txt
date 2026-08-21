@@ -61,13 +61,13 @@ find_package(stdcorelib REQUIRED)
 # Main Project
 # ----------------------------------
 file(GLOB _src src/plugin/*.cpp)
-list(FILTER _src EXCLUDE REGEX "pluginmetadata_(win|linux|mac)\\.cpp$")
+list(FILTER _src EXCLUDE REGEX "pluginloader_(win|linux|mac)\\.cpp$")
 if(WIN32)
-    list(APPEND _src src/plugin/pluginmetadata_win.cpp)
+    list(APPEND _src src/plugin/pluginloader_win.cpp)
 elseif(APPLE)
-    list(APPEND _src src/plugin/pluginmetadata_mac.cpp)
+    list(APPEND _src src/plugin/pluginloader_mac.cpp)
 else()
-    list(APPEND _src src/plugin/pluginmetadata_linux.cpp)
+    list(APPEND _src src/plugin/pluginloader_linux.cpp)
 endif()
 
 if(STDC_PLUGIN_BUILD_STATIC OR(NOT STDC_PLUGIN_BUILD_SHARED AND NOT BUILD_SHARED_LIBS))
