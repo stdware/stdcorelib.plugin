@@ -10,6 +10,7 @@ project(stdcorelib-plugin VERSION 0.1.0.0 LANGUAGES CXX)
 option(STDC_PLUGIN_BUILD_STATIC "Build static library" OFF)
 option(STDC_PLUGIN_BUILD_SHARED "Build shared library" OFF)
 option(STDC_PLUGIN_BUILD_TESTS "Build test cases" OFF)
+option(STDC_PLUGIN_ENABLE_EXCEPTIONS "Build the library with exceptions" ON)
 option(STDC_PLUGIN_INSTALL "Install library" ON)
 
 # ----------------------------------
@@ -86,6 +87,16 @@ add_library(stdcorelib::plugin ALIAS ${PROJECT_NAME})
 
 target_sources(${PROJECT_NAME} PRIVATE ${_src})
 target_compile_definitions(${PROJECT_NAME} PRIVATE STDC_PLUGIN_LIBRARY)
+
+if(STDC_PLUGIN_ENABLE_EXCEPTIONS)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC STDC_PLUGIN_EXCEPTIONS=1)
+else()
+    if(MSVC)
+        target_compile_options(${PROJECT_NAME} PRIVATE /EHs-c- /wd4530)
+    else()
+        target_compile_options(${PROJECT_NAME} PRIVATE -fno-exceptions)
+    endif()
+endif()
 
 target_link_libraries(${PROJECT_NAME} PUBLIC stdcorelib::stdcorelib)
 
