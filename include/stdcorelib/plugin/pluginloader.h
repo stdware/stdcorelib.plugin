@@ -28,29 +28,33 @@ namespace stdc::plugin {
     /// answers \c hasError(), so the reason can be reported instead of the plugin quietly not
     /// being there.
     ///
-    /// Reading a loader costs one small file. Nothing is loaded until \c load() is called, so the
-    /// factory can describe every installed plugin without pulling in the libraries they depend
-    /// on.
+    /// Metadata is read from the library without executing its code. Nothing is loaded until
+    /// \c load() is called, so installed plugins can be described without pulling in the
+    /// libraries they depend on.
     class STDC_PLUGIN_EXPORT PluginLoader {
     public:
+        PluginLoader();
+        explicit PluginLoader(const std::filesystem::path &filePath);
         ~PluginLoader();
 
         PluginLoader(PluginLoader &&RHS) noexcept;
         PluginLoader &operator=(PluginLoader &&RHS) noexcept;
 
         enum State {
-            /// The manifest could not be read. Only \c location() and \c errorMessage() are
-            /// meaningful.
+            /// The manifest could not be read. Only \c errorMessage() is meaningful.
             Invalid,
-
-            /// The manifest has been read. Everything but \c plugin() is meaningful.
+            /// The metadata has been read. Everything but \c plugin() is meaningful.
             Read,
-
             /// The library is loaded and \c plugin() is live.
             Loaded,
         };
 
     public:
+        /// Selects another plugin library and reads its metadata without loading its code.
+        ///
+        /// An already loaded library is unloaded first.
+        void setFilePath(const std::filesystem::path &filePath);
+
         State state() const;
         bool hasError() const;
 
@@ -63,9 +67,6 @@ namespace stdc::plugin {
         /// \note This is the only part of the manifest the factory interprets. Whoever owns the
         ///       extension point decides what the rest of it means.
         const std::string &iid() const;
-
-        /// The directory holding the plugin, which is also where its own resources live.
-        const std::filesystem::path &location() const;
 
         /// The shared library, or empty for a static or runtime plugin.
         const std::filesystem::path &filePath() const;
@@ -82,14 +83,17 @@ namespace stdc::plugin {
         ///       plugin that is installed but unusable to be able to say so.
         bool load();
 
+        /// Unloads the library, invalidating the pointer returned by \c plugin().
+        bool unload();
+
+        bool isLoaded() const;
+
         /// The loaded instance, or null while \c state() is below \c Loaded.
         Plugin *plugin() const;
 
     protected:
         class Impl;
         std::unique_ptr<Impl> _impl;
-
-        explicit PluginLoader(Impl &impl);
 
         friend class PluginFactory;
 

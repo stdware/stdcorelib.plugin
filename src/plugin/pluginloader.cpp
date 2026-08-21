@@ -2,6 +2,7 @@
 
 #include "pluginloader.h"
 #include "pluginloader_p.h"
+#include "pluginmetadata_p.h"
 
 #include <fstream>
 #include <sstream>
@@ -24,10 +25,19 @@ namespace stdc::plugin {
     PluginLoader::Impl::Impl() {
     }
 
-    PluginLoader::Impl::~Impl() {
-        // A library is unloaded with the loader that opened it. Static and runtime plugins are
-        // owned by whoever registered them and are only borrowed here.
-        delete library;
+    PluginLoader::Impl::~Impl() = default;
+
+    void PluginLoader::Impl::reset() {
+        library.reset();
+        plugin = nullptr;
+        state = PluginLoader::Invalid;
+        hasError = false;
+        errorMessage.clear();
+        iid.clear();
+        filePath.clear();
+        metadata = json::Value();
+        origin = FileSystem;
+        staticInstance = nullptr;
     }
 
     bool PluginLoader::Impl::reportError(std::string err) {
@@ -38,8 +48,7 @@ namespace stdc::plugin {
     }
 
     bool PluginLoader::Impl::read(const std::filesystem::path &manifestPath) {
-        location = manifestPath.parent_path();
-
+        reset();
         std::ifstream file(manifestPath);
         if (!file.is_open()) {
             return reportError(formatN(R"(failed to open "%1")", manifestPath));
@@ -53,8 +62,52 @@ namespace stdc::plugin {
         if (parseError) {
             return reportError(formatN(R"(%1: %2)", manifestPath, parseError.message()));
         }
+        return readMetadata(root, manifestPath);
+    }
+
+    bool PluginLoader::Impl::readLibrary(const std::filesystem::path &libraryPath) {
+        reset();
+        filePath = fs::absolute(libraryPath);
+        if (!fs::is_regular_file(filePath)) {
+            return reportError(formatN(R"(%1: is not a regular file)", filePath));
+        }
+
+#ifdef _WIN32
+        auto overridePath = filePath.parent_path() / (filePath.stem().native() + L".plugin.json");
+#else
+        auto overridePath = filePath.parent_path() / (filePath.stem().string() + ".plugin.json");
+#endif
+        std::string text;
+        std::filesystem::path sourcePath = filePath;
+        if (fs::is_regular_file(overridePath)) {
+            std::ifstream file(overridePath);
+            std::stringstream ss;
+            ss << file.rdbuf();
+            text = ss.str();
+            sourcePath = overridePath;
+        } else {
+            std::string readError;
+            if (!read_embedded_metadata(filePath, &text, &readError)) {
+                return reportError(formatN(R"(%1: %2)", filePath, readError));
+            }
+        }
+        while (!text.empty() && text.back() == '\0') {
+            text.pop_back();
+        }
+
+        json::ParseError parseError;
+        auto root = json::Value::fromJson(text, true, &parseError);
+        if (parseError) {
+            return reportError(formatN(R"(%1: %2)", sourcePath, parseError.message()));
+        }
+        return readMetadata(root, sourcePath, filePath);
+    }
+
+    bool PluginLoader::Impl::readMetadata(const json::Value &root,
+                                          const std::filesystem::path &sourcePath,
+                                          const std::filesystem::path &boundFilePath) {
         if (!root.isObject()) {
-            return reportError(formatN(R"(%1: not a JSON object)", manifestPath));
+            return reportError(formatN(R"(%1: not a JSON object)", sourcePath));
         }
         const auto &obj = root.toObject();
 
@@ -70,35 +123,38 @@ namespace stdc::plugin {
 
         std::string_view version;
         if (!stringField("$version", &version)) {
-            return reportError(formatN(R"(%1: missing or invalid "$version" field)", manifestPath));
+            return reportError(formatN(R"(%1: missing or invalid "$version" field)", sourcePath));
         }
         if (version != manifestVersion) {
             return reportError(
-                formatN(R"(%1: unsupported manifest version "%2")", manifestPath, version));
+                formatN(R"(%1: unsupported manifest version "%2")", sourcePath, version));
         }
 
         std::string_view iid_;
         if (!stringField("iid", &iid_)) {
-            return reportError(formatN(R"(%1: missing or invalid "iid" field)", manifestPath));
+            return reportError(formatN(R"(%1: missing or invalid "iid" field)", sourcePath));
         }
         iid = iid_;
 
         std::string_view binary;
-        if (!stringField("binary", &binary)) {
-            return reportError(formatN(R"(%1: missing or invalid "binary" field)", manifestPath));
+        if (boundFilePath.empty()) {
+            if (!stringField("binary", &binary)) {
+                return reportError(formatN(R"(%1: missing or invalid "binary" field)", sourcePath));
+            }
+            filePath = sourcePath.parent_path() / path::from_utf8(binary);
+        } else {
+            filePath = boundFilePath;
         }
-        filePath = location / path::from_utf8(binary);
         if (!fs::is_regular_file(filePath)) {
             return reportError(
-                formatN(R"(%1: "binary" names "%2", which is not there)", manifestPath, filePath));
+                formatN(R"(%1: "binary" names "%2", which is not there)", sourcePath, filePath));
         }
 
         // Whatever is in here belongs to the extension point named by iid. Check that it is an
         // object and leave it alone otherwise, an absent one meaning an empty one.
         if (auto it = obj.find("metadata"); it != obj.end()) {
             if (!it->second.isObject()) {
-                return reportError(
-                    formatN(R"(%1: "metadata" field is not an object)", manifestPath));
+                return reportError(formatN(R"(%1: "metadata" field is not an object)", sourcePath));
             }
             metadata = it->second;
         } else {
@@ -126,28 +182,51 @@ namespace stdc::plugin {
             return true;
         }
 
-        auto so = std::make_unique<SharedLibrary>();
-        if (!so->open(filePath, SharedLibrary::SearchLibraryLoadDirectoryHint)) {
-            return reportError(formatN(R"(%1: %2)", filePath, so->errorMessage()));
+        library.emplace();
+        if (!library->open(filePath, SharedLibrary::SearchLibraryLoadDirectoryHint)) {
+            auto message = library->errorMessage();
+            library.reset();
+            return reportError(formatN(R"(%1: %2)", filePath, message));
         }
 
-        auto getter = reinterpret_cast<Plugin *(*) ()>(so->resolve(STDC_PLUGIN_INSTANCE_SYMBOL));
+        auto getter =
+            reinterpret_cast<Plugin *(*) ()>(library->resolve(STDC_PLUGIN_INSTANCE_SYMBOL));
         if (!getter) {
+            library.reset();
             return reportError(
                 formatN(R"(%1: does not export "%2")", filePath, STDC_PLUGIN_INSTANCE_SYMBOL));
         }
 
         plugin = getter();
         if (!plugin) {
+            library.reset();
             return reportError(formatN(R"(%1: exported no instance)", filePath));
         }
 
-        library = so.release();
         state = PluginLoader::Loaded;
         return true;
     }
 
-    PluginLoader::PluginLoader(Impl &impl) : _impl(&impl) {
+    bool PluginLoader::Impl::unloadLibrary() {
+        if (state != PluginLoader::Loaded || origin != FileSystem) {
+            return state != PluginLoader::Loaded;
+        }
+        if (!library->close()) {
+            errorMessage = library->errorMessage();
+            hasError = true;
+            return false;
+        }
+        library.reset();
+        plugin = nullptr;
+        state = PluginLoader::Read;
+        return true;
+    }
+
+    PluginLoader::PluginLoader() : _impl(new Impl) {
+    }
+
+    PluginLoader::PluginLoader(const std::filesystem::path &filePath) : PluginLoader() {
+        _impl->readLibrary(filePath);
     }
 
     PluginLoader::~PluginLoader() = default;
@@ -155,6 +234,11 @@ namespace stdc::plugin {
     PluginLoader::PluginLoader(PluginLoader &&RHS) noexcept = default;
 
     PluginLoader &PluginLoader::operator=(PluginLoader &&RHS) noexcept = default;
+
+    void PluginLoader::setFilePath(const std::filesystem::path &filePath) {
+        stdc_impl_t;
+        impl.readLibrary(filePath);
+    }
 
     PluginLoader::State PluginLoader::state() const {
         stdc_impl_t;
@@ -176,11 +260,6 @@ namespace stdc::plugin {
         return impl.iid;
     }
 
-    const std::filesystem::path &PluginLoader::location() const {
-        stdc_impl_t;
-        return impl.location;
-    }
-
     const std::filesystem::path &PluginLoader::filePath() const {
         stdc_impl_t;
         return impl.filePath;
@@ -194,6 +273,16 @@ namespace stdc::plugin {
     bool PluginLoader::load() {
         stdc_impl_t;
         return impl.loadLibrary();
+    }
+
+    bool PluginLoader::unload() {
+        stdc_impl_t;
+        return impl.unloadLibrary();
+    }
+
+    bool PluginLoader::isLoaded() const {
+        stdc_impl_t;
+        return impl.state == Loaded;
     }
 
     Plugin *PluginLoader::plugin() const {

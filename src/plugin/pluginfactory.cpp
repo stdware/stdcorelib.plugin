@@ -26,9 +26,7 @@ namespace stdc::plugin {
     PluginFactory::Impl::~Impl() = default;
 
     PluginLoader *PluginFactory::Impl::createLoader() {
-        auto loaderImpl = new PluginLoader::Impl;
-        auto loader = new PluginLoader(*loaderImpl);
-        return loader;
+        return new PluginLoader;
     }
 
     void PluginFactory::Impl::scanPlugins(const char *iid) const {

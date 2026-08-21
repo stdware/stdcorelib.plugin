@@ -1,0 +1,7 @@
+{
+    "$version": "1.0",
+    "iid": "org.stdcorelib.LoaderTest",
+    "metadata": {
+        "answer": 42
+    }
+}

@@ -11,7 +11,24 @@ if(NOT Boost_FOUND)
 endif()
 
 file(GLOB _src *.cpp)
+list(REMOVE_ITEM _src ${CMAKE_CURRENT_SOURCE_DIR}/pluginloader_test_plugin.cpp)
 add_executable(${PROJECT_NAME} ${_src})
+
+add_library(pluginloader_test_plugin MODULE pluginloader_test_plugin.cpp)
+target_link_libraries(pluginloader_test_plugin PRIVATE stdcorelib::plugin)
+set_target_properties(pluginloader_test_plugin PROPERTIES PREFIX "")
+
+if(WIN32)
+    target_sources(pluginloader_test_plugin PRIVATE pluginloader_test_plugin.rc)
+    set_property(SOURCE pluginloader_test_plugin.rc PROPERTY OBJECT_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/pluginloader_test_plugin.json
+    )
+endif()
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    TEST_PLUGINLOADER_PLUGIN_PATH="$<TARGET_FILE:pluginloader_test_plugin>"
+)
+add_dependencies(${PROJECT_NAME} pluginloader_test_plugin)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE stdcorelib::plugin)
 target_link_libraries(${PROJECT_NAME} PRIVATE Boost::unit_test_framework)
