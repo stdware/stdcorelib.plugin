@@ -137,8 +137,7 @@ namespace stdc::plugin {
 
         friend class PluginFactory;
 
-        PluginLoader(const PluginLoader &) = delete;
-        PluginLoader &operator=(const PluginLoader &) = delete;
+        STDC_DISABLE_COPY(PluginLoader)
     };
 
     /// @}
