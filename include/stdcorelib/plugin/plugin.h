@@ -41,17 +41,33 @@ namespace stdc::plugin {
         MetadataFunction metadata = nullptr;
     };
 
-    /// The process-wide registry of plugins linked into the program.
-    using StaticPluginRegistry = StaticRegistry<StaticPlugin>;
-
     /// @}
 
 }
 
-#if !defined(STDC_PLUGIN_LIBRARY)
 namespace stdc {
-    extern template class STDC_PLUGIN_EXPORT StaticRegistry<plugin::StaticPlugin>;
+
+    template <>
+    struct static_registry_traits<plugin::StaticPlugin> {
+        using result_type = plugin::StaticPlugin;
+
+        template <class V>
+        static result_type construct() {
+            return V();
+        }
+    };
+
 }
+
+namespace stdc::plugin {
+
+    /// The process-wide registry of plugins linked into the program.
+    using StaticPluginRegistry = StaticRegistry<StaticPlugin>;
+
+}
+
+#if !defined(STDC_PLUGIN_LIBRARY)
+extern template class STDC_PLUGIN_EXPORT stdc::StaticRegistry<stdc::plugin::StaticPlugin>;
 #endif
 
 /// The symbol a plugin library exports, as a string, for whoever has to resolve it.
@@ -71,15 +87,14 @@ namespace stdc {
 #define STDC_EXPORT_STATIC_PLUGIN(PLUGIN_NAME, PLUGIN_SET, METADATA)                               \
     namespace {                                                                                    \
         stdc::plugin::StaticPluginRegistry::AddFactory                                             \
-            PLUGIN_NAME##_initializer(PLUGIN_SET, "",                                              \
-                                      []() -> std::unique_ptr<stdc::plugin::StaticPlugin> {        \
-                                          return std::make_unique<stdc::plugin::StaticPlugin>(     \
-                                              []() -> stdc::plugin::Plugin * {                     \
-                                                  static PLUGIN_NAME _instance;                    \
-                                                  return &_instance;                               \
-                                              },                                                   \
-                                              []() -> stdc::json::Value { return (METADATA); });   \
-                                      });                                                          \
+            PLUGIN_NAME##_initializer(PLUGIN_SET, "", []() -> stdc::plugin::StaticPlugin {         \
+                return stdc::plugin::StaticPlugin(                                                 \
+                    []() -> stdc::plugin::Plugin * {                                               \
+                        static PLUGIN_NAME _instance;                                              \
+                        return &_instance;                                                         \
+                    },                                                                             \
+                    []() -> stdc::json::Value { return (METADATA); });                             \
+            });                                                                                    \
     }
 
 #endif // STDCORELIB_PLUGIN_PLUGIN_H

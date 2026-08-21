@@ -106,7 +106,7 @@ namespace stdc::plugin {
         std::vector<StaticPlugin> plugins;
         for (const auto &entry : StaticPluginRegistry::entries()) {
             if (entry.name() == pluginSet) {
-                plugins.push_back(*entry.instantiate());
+                plugins.push_back(entry.instantiate());
             }
         }
         return plugins;

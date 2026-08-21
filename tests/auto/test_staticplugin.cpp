@@ -15,6 +15,8 @@ namespace {
     static_assert(std::is_move_assignable_v<stdc::plugin::PluginLoader>);
     static_assert(!std::is_copy_constructible_v<stdc::plugin::PluginLoader>);
     static_assert(!std::is_copy_assignable_v<stdc::plugin::PluginLoader>);
+    static_assert(std::is_same_v<stdc::plugin::StaticPluginRegistry::result_type,
+                                 stdc::plugin::StaticPlugin>);
 
     class TestStaticPlugin : public stdc::plugin::Plugin {};
 

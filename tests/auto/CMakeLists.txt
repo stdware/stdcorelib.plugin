@@ -13,8 +13,8 @@ endif()
 file(GLOB _src *.cpp)
 add_executable(${PROJECT_NAME} ${_src})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE Boost::unit_test_framework)
 target_link_libraries(${PROJECT_NAME} PRIVATE stdcorelib::plugin)
+target_link_libraries(${PROJECT_NAME} PRIVATE Boost::unit_test_framework)
 
 # Some tests reach into private headers (src/plugin/*_p.h) to cover internals the public API
 # cannot get at on its own.
