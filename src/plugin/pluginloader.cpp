@@ -3,6 +3,7 @@
 #include "pluginloader.h"
 #include "pluginloader_p.h"
 
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <utility>
@@ -287,6 +288,27 @@ namespace stdc::plugin {
     Plugin *PluginLoader::plugin() const {
         stdc_impl_t;
         return impl.plugin;
+    }
+
+    std::vector<std::string> PluginLoader::staticPluginSets() {
+        std::vector<std::string> pluginSets;
+        for (const auto &entry : StaticPluginRegistry::entries()) {
+            auto pluginSet = std::string(entry.name());
+            if (std::find(pluginSets.begin(), pluginSets.end(), pluginSet) == pluginSets.end()) {
+                pluginSets.push_back(std::move(pluginSet));
+            }
+        }
+        return pluginSets;
+    }
+
+    std::vector<StaticPlugin> PluginLoader::staticPlugins(const char *pluginSet) {
+        std::vector<StaticPlugin> plugins;
+        for (const auto &entry : StaticPluginRegistry::entries()) {
+            if (entry.name() == pluginSet) {
+                plugins.push_back(entry.instantiate());
+            }
+        }
+        return plugins;
     }
 
 }

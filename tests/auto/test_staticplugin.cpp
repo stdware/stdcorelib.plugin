@@ -32,10 +32,10 @@ STDC_EXPORT_STATIC_PLUGIN(TestStaticPlugin, "test",
 BOOST_AUTO_TEST_SUITE(test_staticplugin)
 
 BOOST_AUTO_TEST_CASE(test_registry) {
-    const auto sets = stdc::plugin::PluginFactory::staticPluginSets();
+    const auto sets = stdc::plugin::PluginLoader::staticPluginSets();
     BOOST_CHECK(std::find(sets.begin(), sets.end(), "test") != sets.end());
 
-    const auto plugins = stdc::plugin::PluginFactory::staticPlugins("test");
+    const auto plugins = stdc::plugin::PluginLoader::staticPlugins("test");
     BOOST_REQUIRE_EQUAL(plugins.size(), 1u);
     BOOST_REQUIRE(plugins.front().instance);
     BOOST_REQUIRE(plugins.front().metadata);

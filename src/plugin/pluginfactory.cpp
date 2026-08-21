@@ -4,7 +4,6 @@
 #include "pluginfactory_p.h"
 #include "pluginloader_p.h"
 
-#include <algorithm>
 #include <mutex>
 #include <utility>
 
@@ -89,32 +88,11 @@ namespace stdc::plugin {
 
     PluginFactory::~PluginFactory() = default;
 
-    std::vector<std::string> PluginFactory::staticPluginSets() {
-        std::vector<std::string> pluginSets;
-        for (const auto &entry : StaticPluginRegistry::entries()) {
-            auto pluginSet = std::string(entry.name());
-            if (std::find(pluginSets.begin(), pluginSets.end(), pluginSet) == pluginSets.end()) {
-                pluginSets.push_back(std::move(pluginSet));
-            }
-        }
-        return pluginSets;
-    }
-
-    std::vector<StaticPlugin> PluginFactory::staticPlugins(const char *pluginSet) {
-        std::vector<StaticPlugin> plugins;
-        for (const auto &entry : StaticPluginRegistry::entries()) {
-            if (entry.name() == pluginSet) {
-                plugins.push_back(entry.instantiate());
-            }
-        }
-        return plugins;
-    }
-
     void PluginFactory::addStaticPlugins(const char *pluginSet) {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
-        for (const StaticPlugin &plugin : staticPlugins(pluginSet)) {
+        for (const StaticPlugin &plugin : PluginLoader::staticPlugins(pluginSet)) {
             auto loader = Impl::createLoader();
             auto &loaderImpl = *loader->_impl;
             loaderImpl.origin = PluginLoader::Impl::Static;

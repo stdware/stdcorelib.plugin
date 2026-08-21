@@ -6,18 +6,19 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <stdcorelib/stdc_global.h>
 #include <stdcorelib/support/json.h>
 
 #include <stdcorelib/stdc_plugin_global.h>
 
+#include <stdcorelib/plugin/plugin.h>
+
 namespace stdc::plugin {
 
     /// \addtogroup plugin
     /// @{
-
-    class Plugin;
 
     class PluginFactory;
 
@@ -90,6 +91,10 @@ namespace stdc::plugin {
 
         /// The loaded instance, or null while \c state() is below \c Loaded.
         Plugin *plugin() const;
+
+    public:
+        static std::vector<std::string> staticPluginSets();
+        static std::vector<StaticPlugin> staticPlugins(const char *pluginSet);
 
     protected:
         class Impl;

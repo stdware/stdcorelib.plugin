@@ -19,8 +19,6 @@ namespace stdc::plugin {
 
     class Plugin;
 
-    class StaticPlugin;
-
     /// Finds plugins and hands out what is known about them.
     ///
     /// The factory knows three things about a plugin: which extension point it plugs into, where
@@ -39,10 +37,6 @@ namespace stdc::plugin {
     public:
         PluginFactory();
         virtual ~PluginFactory();
-
-    public:
-        static std::vector<std::string> staticPluginSets();
-        static std::vector<StaticPlugin> staticPlugins(const char *pluginSet);
 
     public:
         /// Takes the statically linked plugins registered under \a pluginSet into this factory.
