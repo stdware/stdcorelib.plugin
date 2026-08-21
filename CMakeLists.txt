@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.16)
 
 project(stdcorelib-plugin VERSION 0.1.0.0 LANGUAGES CXX)
 
-include(cmake/AddPlugin.cmake)
-
 # ----------------------------------
 # Build Options
 # ----------------------------------
@@ -62,6 +60,8 @@ find_package(stdcorelib REQUIRED)
 # ----------------------------------
 # Main Project
 # ----------------------------------
+include(cmake/AddPluginMetadata.cmake)
+
 file(GLOB _src src/plugin/*.cpp)
 list(FILTER _src EXCLUDE REGEX "pluginloader_(win|linux|mac)\\.cpp$")
 if(WIN32)
@@ -114,9 +114,10 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 # Add platform specific
 if(WIN32)
-    set(RC_DESCRIPTION "C++ Plugin Framework")
-    set(RC_COPYRIGHT "Copyright (C) 2025-present Stdware Collections")
-    include("cmake/winrc.cmake")
+    stdc_add_win_rc(${PROJECT_NAME}
+        DESCRIPTION "C++ Plugin Framework"
+        COPYRIGHT "Copyright (C) 2025-present Stdware Collections"
+    )
 endif()
 
 if(NOT WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -158,8 +159,9 @@ if(STDC_PLUGIN_INSTALL)
     install(FILES
         "${CMAKE_CURRENT_BINARY_DIR}/${STDC_PLUGIN_INSTALL_NAME}Config.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/${STDC_PLUGIN_INSTALL_NAME}ConfigVersion.cmake"
-        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/AddPlugin.cmake"
-        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GeneratePluginMetadata.cmake"
+        DESTINATION ${_install_dir}
+    )
+    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
         DESTINATION ${_install_dir}
     )
 

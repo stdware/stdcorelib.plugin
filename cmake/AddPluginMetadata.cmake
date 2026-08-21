@@ -1,7 +1,10 @@
 set(_STDC_PLUGIN_METADATA_GENERATOR
-    "${CMAKE_CURRENT_LIST_DIR}/GeneratePluginMetadata.cmake"
+    "${CMAKE_CURRENT_LIST_DIR}/commands/GeneratePluginMetadata.cmake"
 )
 
+# Embeds a JSON metadata file into a plugin target.
+#
+# stdc_add_plugin_metadata(<target> <metadata-json>)
 function(stdc_add_plugin_metadata _target _metadata_json)
     if(NOT TARGET ${_target})
         message(FATAL_ERROR "stdc_add_plugin_metadata: '${_target}' is not a target")
