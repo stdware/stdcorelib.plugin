@@ -147,7 +147,7 @@ BOOST_AUTO_TEST_CASE(test_load_failed) {
     BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::LoadFailed);
     BOOST_CHECK(loader.hasError());
     BOOST_CHECK(loader.unload());
-    BOOST_CHECK(loader.hasError());
+    BOOST_CHECK(!loader.hasError());
 }
 
 BOOST_AUTO_TEST_CASE(test_factory_scan_hooks) {
