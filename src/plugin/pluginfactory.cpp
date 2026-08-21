@@ -2,24 +2,20 @@
 
 #include "pluginfactory.h"
 #include "pluginfactory_p.h"
+#include "pluginloader_p.h"
 
-#include <fstream>
 #include <mutex>
-#include <sstream>
 #include <utility>
 
-#include <stdcorelib/path.h>
 #include <stdcorelib/pimpl.h>
 #include <stdcorelib/stlextra/algorithms.h>
+#include <stdcorelib/support/sharedlibrary.h>
 
 namespace fs = std::filesystem;
 
 STDC_INSTANTIATE_STATIC_REGISTRY_EXPORT(stdc::plugin::StaticPlugin, STDC_PLUGIN_EXPORT)
 
 namespace stdc::plugin {
-
-    /// The file that says what a plugin is. One per plugin directory.
-    static constexpr const char *manifestName = "plugin.json";
 
     PluginFactory::Impl::Impl() {
     }
@@ -104,9 +100,22 @@ namespace stdc::plugin {
         if (ec) {
             return false;
         }
-        for (const auto &entry : dir) {
-            if (entry.is_directory() && fs::is_regular_file(entry.path() / manifestName)) {
-                pluginPaths->push_back(entry.path());
+
+        const fs::directory_iterator end;
+        while (dir != end) {
+            const auto candidate = dir->path();
+            if (SharedLibrary::isLibrary(candidate)) {
+                std::string metadata;
+                std::string errorMessage;
+                if (PluginLoader::Impl::readEmbeddedMetadata(candidate, &metadata,
+                                                             &errorMessage)) {
+                    pluginPaths->push_back(candidate);
+                }
+            }
+
+            dir.increment(ec);
+            if (ec) {
+                return false;
             }
         }
         return true;
@@ -116,26 +125,8 @@ namespace stdc::plugin {
         PluginFactory::resolvePluginPath(const std::filesystem::path &path,
                                          std::filesystem::path *pluginPath,
                                          std::optional<std::filesystem::path> *metadataPath) const {
-        auto manifest = path / manifestName;
-        std::ifstream file(manifest);
-        if (!file.is_open()) {
-            return false;
-        }
-
-        std::stringstream ss;
-        ss << file.rdbuf();
-        json::ParseError parseError;
-        auto root = json::Value::fromJson(ss.str(), true, &parseError);
-        if (parseError || !root.isObject()) {
-            return false;
-        }
-
-        auto binary = root["binary"];
-        if (!binary.isString() || binary.toString().empty()) {
-            return false;
-        }
-        *pluginPath = path / stdc::path::from_utf8(binary.toString());
-        *metadataPath = std::move(manifest);
+        *pluginPath = path;
+        metadataPath->reset();
         return true;
     }
 

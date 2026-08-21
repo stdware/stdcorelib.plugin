@@ -91,7 +91,8 @@ extern template class STDC_PLUGIN_EXPORT stdc::StaticRegistry<stdc::plugin::Stat
 #  define STDC_PLUGIN_METADATA_SECTION __attribute__((section(".stdc_metadata"), used))
 #endif
 
-/// Exports \a PLUGIN_NAME from a shared library. The plugin.json beside it says the rest.
+/// Exports \a PLUGIN_NAME from a shared library. Its manifest may be embedded or supplied beside
+/// the library according to the factory's scanning policy.
 #define STDC_EXPORT_PLUGIN(PLUGIN_NAME)                                                            \
     extern "C" STDC_DECL_EXPORT stdc::plugin::Plugin *stdc_plugin_instance() {                     \
         static PLUGIN_NAME _instance;                                                              \

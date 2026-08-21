@@ -4,13 +4,25 @@
 #include <stdcorelib/plugin/pluginloader.h>
 
 #include <chrono>
-#include <fstream>
 
 #include <boost/test/unit_test.hpp>
 
 namespace {
 
     class RuntimePlugin : public stdc::plugin::Plugin {};
+
+    class DefaultPluginFactoryProbe : public stdc::plugin::PluginFactory {
+    public:
+        bool scan(const std::filesystem::path &path,
+                  std::vector<std::filesystem::path> *pluginPaths) const {
+            return scanPluginPaths(path, pluginPaths);
+        }
+
+        bool resolve(const std::filesystem::path &path, std::filesystem::path *pluginPath,
+                     std::optional<std::filesystem::path> *metadataPath) const {
+            return resolvePluginPath(path, pluginPath, metadataPath);
+        }
+    };
 
     class TestPluginFactory : public stdc::plugin::PluginFactory {
     protected:
@@ -49,15 +61,13 @@ namespace {
             auto suffix = std::chrono::steady_clock::now().time_since_epoch().count();
             _path = std::filesystem::temp_directory_path() /
                     ("stdcorelib-plugin-test-" + std::to_string(suffix));
-            auto pluginDirectory = _path / "plugin";
-            std::filesystem::create_directories(pluginDirectory);
+            std::filesystem::create_directories(_path);
 
-            auto source = std::filesystem::path(TEST_PLUGINLOADER_PLUGIN_PATH);
-            std::filesystem::copy_file(source, pluginDirectory / source.filename());
+            const auto plugin = std::filesystem::path(TEST_PLUGINLOADER_PLUGIN_PATH);
+            std::filesystem::copy_file(plugin, _path / plugin.filename());
 
-            std::ofstream manifest(pluginDirectory / "plugin.json");
-            manifest << R"({"$version":"1.0","iid":"org.stdcorelib.LoaderTest","binary":")"
-                     << source.filename().string() << R"(","metadata":{"answer":42}})";
+            const auto library = std::filesystem::path(TEST_PLUGINLOADER_LIBRARY_PATH);
+            std::filesystem::copy_file(library, _path / library.filename());
         }
 
         ~TemporaryPluginDirectory() {
@@ -178,7 +188,20 @@ BOOST_AUTO_TEST_CASE(test_factory_retries_failed_scan) {
 
 BOOST_AUTO_TEST_CASE(test_default_factory_scan) {
     TemporaryPluginDirectory directory;
-    stdc::plugin::PluginFactory factory;
+    DefaultPluginFactoryProbe factory;
+
+    std::vector<std::filesystem::path> candidates;
+    BOOST_REQUIRE(factory.scan(directory.path(), &candidates));
+    BOOST_REQUIRE_EQUAL(candidates.size(), 1u);
+    BOOST_CHECK_EQUAL(candidates.front().filename(),
+                      std::filesystem::path(TEST_PLUGINLOADER_PLUGIN_PATH).filename());
+
+    std::filesystem::path pluginPath;
+    std::optional<std::filesystem::path> metadataPath = TEST_PLUGINLOADER_METADATA_PATH;
+    BOOST_REQUIRE(factory.resolve(candidates.front(), &pluginPath, &metadataPath));
+    BOOST_CHECK_EQUAL(pluginPath, candidates.front());
+    BOOST_CHECK(!metadataPath);
+
     factory.addPluginPath("org.stdcorelib.LoaderTest", directory.path());
 
     const auto plugins = factory.plugins("org.stdcorelib.LoaderTest");

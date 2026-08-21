@@ -13,20 +13,29 @@ endif()
 file(GLOB _src *.cpp)
 add_executable(${PROJECT_NAME} ${_src})
 
-set(_plugin_dir ${CMAKE_CURRENT_SOURCE_DIR}/plugins/pluginloader_test_plugin)
+set(_plugin_dir ${CMAKE_CURRENT_SOURCE_DIR}/plugins/test_pluginloader_plugin)
 
-add_library(pluginloader_test_plugin MODULE ${_plugin_dir}/pluginloader_test_plugin.cpp)
-target_link_libraries(pluginloader_test_plugin PRIVATE stdcorelib::plugin)
-set_target_properties(pluginloader_test_plugin PROPERTIES PREFIX "")
-stdc_add_plugin_metadata(pluginloader_test_plugin
-    ${_plugin_dir}/pluginloader_test_plugin.json
+add_library(test_pluginloader_plugin MODULE ${_plugin_dir}/test_pluginloader_plugin.cpp)
+target_link_libraries(test_pluginloader_plugin PRIVATE stdcorelib::plugin)
+set_target_properties(test_pluginloader_plugin PROPERTIES PREFIX "")
+stdc_add_plugin_metadata(test_pluginloader_plugin
+    ${_plugin_dir}/test_pluginloader_plugin.json
 )
+
+add_library(test_pluginloader_library MODULE
+    ${CMAKE_CURRENT_SOURCE_DIR}/plugins/test_pluginloader_library.cpp
+)
+set_target_properties(test_pluginloader_library PROPERTIES PREFIX "")
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
-    TEST_PLUGINLOADER_PLUGIN_PATH="$<TARGET_FILE:pluginloader_test_plugin>"
-    TEST_PLUGINLOADER_METADATA_PATH="${_plugin_dir}/pluginloader_test_plugin.json"
+    TEST_PLUGINLOADER_PLUGIN_PATH="$<TARGET_FILE:test_pluginloader_plugin>"
+    TEST_PLUGINLOADER_LIBRARY_PATH="$<TARGET_FILE:test_pluginloader_library>"
+    TEST_PLUGINLOADER_METADATA_PATH="${_plugin_dir}/test_pluginloader_plugin.json"
 )
-add_dependencies(${PROJECT_NAME} pluginloader_test_plugin)
+add_dependencies(${PROJECT_NAME}
+    test_pluginloader_library
+    test_pluginloader_plugin
+)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE stdcorelib::plugin)
 target_link_libraries(${PROJECT_NAME} PRIVATE Boost::unit_test_framework)

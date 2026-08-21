@@ -32,7 +32,7 @@ namespace stdc::plugin {
     /// So the factory hands over the candidates and whoever owns the extension point chooses.
     ///
     /// Plugins reach it three ways:
-    ///  - filesystem plugins: a directory per plugin, holding a plugin.json and the library
+    ///  - filesystem plugins: shared libraries with embedded manifests in a search directory
     ///  - static plugins    : linked into the program, handing over the same metadata directly
     ///  - runtime plugins   : instances the program supplies, owned by the program
     ///
@@ -60,7 +60,7 @@ namespace stdc::plugin {
         void addRuntimePlugin(Plugin *plugin, const json::Value &metadata);
 
     public:
-        /// Adds a directory to search for \a iid. Each subdirectory holding a plugin.json is one
+        /// Adds a directory to search for \a iid. Each library carrying embedded metadata is one
         /// plugin.
         void addPluginPath(std::string_view iid, const std::filesystem::path &path);
         void setPluginPaths(std::string_view iid, array_view<std::filesystem::path> paths);
@@ -78,6 +78,9 @@ namespace stdc::plugin {
     protected:
         /// Finds candidate plugin paths under a registered search directory.
         ///
+        /// The default implementation examines each library file directly under \a path and
+        /// silently ignores files without embedded plugin metadata.
+        ///
         /// \param path The directory registered with \c addPluginPath().
         /// \param pluginPaths Receives the candidate paths to resolve.
         /// \return Whether the directory was scanned successfully.
@@ -88,7 +91,8 @@ namespace stdc::plugin {
 
         /// Resolves a candidate into the paths passed to \c PluginLoader::setFilePath().
         ///
-        /// An empty \a metadataPath makes the loader read embedded metadata.
+        /// The default implementation returns \a path unchanged and clears \a metadataPath, which
+        /// makes the loader read embedded metadata.
         ///
         /// \param path A candidate returned by \c scanPluginPaths().
         /// \param pluginPath Receives the plugin library path.

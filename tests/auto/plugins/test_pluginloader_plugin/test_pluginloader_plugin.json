@@ -2,6 +2,9 @@
     "$version": "1.0",
     "iid": "org.stdcorelib.LoaderTest",
     "metadata": {
+        "id": "org.stdcorelib.LoaderTest",
+        "name": "Loader Test",
+        "version": "1.0.0",
         "answer": 42
     }
 }
