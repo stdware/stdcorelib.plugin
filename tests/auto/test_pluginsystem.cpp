@@ -191,6 +191,68 @@ BOOST_AUTO_TEST_CASE(test_dependency_metadata) {
                       stdc::pluginsystem::PluginDependency::Optional);
 }
 
+BOOST_AUTO_TEST_CASE(test_settings_override_metadata_default_and_freeze_at_load) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    directory.addPlugin(
+        "plugin", R"({"id":"Plugin","name":"Plugin","version":"1.0","enabledByDefault":false})");
+
+    stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
+                                            stdc::pluginsystem::PluginSystem::Directory);
+    system.setPluginPaths(directory.path());
+    auto spec = findPlugin(system.plugins(), "Plugin");
+    BOOST_REQUIRE(spec);
+    BOOST_CHECK(!spec->enabledByDefault());
+    BOOST_CHECK(!spec->isEnabled());
+
+    stdc::pluginsystem::PluginSettings settings;
+    settings.setPluginEnabled("Plugin", true);
+    system.setPluginSettings(settings);
+    BOOST_CHECK(spec->isEnabled());
+
+    system.loadPlugins();
+    BOOST_CHECK_EQUAL(spec->state(), stdc::pluginsystem::PluginSpec::Running);
+
+    settings.setPluginEnabled("Plugin", false);
+    system.setPluginSettings(settings);
+    BOOST_CHECK(spec->isEnabled());
+    BOOST_REQUIRE(system.pluginSettings().pluginEnabled("Plugin"));
+    BOOST_CHECK(*system.pluginSettings().pluginEnabled("Plugin"));
+}
+
+BOOST_AUTO_TEST_CASE(test_disabled_dependencies) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    directory.addPlugin("provider", R"({"id":"Provider","name":"Provider","version":"1.0"})");
+    directory.addPlugin(
+        "required",
+        R"({"id":"Required","name":"Required","version":"1.0","dependencies":[{"id":"Provider","version":"1.0","type":"required"}]})");
+    directory.addPlugin(
+        "optional",
+        R"({"id":"Optional","name":"Optional","version":"1.0","dependencies":[{"id":"Provider","version":"1.0","type":"optional"}]})");
+
+    stdc::pluginsystem::PluginSettings settings;
+    settings.setPluginEnabled("Provider", false);
+
+    stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
+                                            stdc::pluginsystem::PluginSystem::Directory);
+    system.setPluginPaths(directory.path());
+    system.setPluginSettings(settings);
+    system.loadPlugins();
+
+    const auto specs = system.plugins();
+    auto provider = findPlugin(specs, "Provider");
+    auto required = findPlugin(specs, "Required");
+    auto optional = findPlugin(specs, "Optional");
+    BOOST_REQUIRE(provider);
+    BOOST_REQUIRE(required);
+    BOOST_REQUIRE(optional);
+    BOOST_CHECK(!provider->isEnabled());
+    BOOST_CHECK_EQUAL(provider->state(), stdc::pluginsystem::PluginSpec::Read);
+    BOOST_CHECK(!provider->hasError());
+    BOOST_CHECK_EQUAL(required->state(), stdc::pluginsystem::PluginSpec::Invalid);
+    BOOST_CHECK(required->errorMessage().find("disabled") != std::string::npos);
+    BOOST_CHECK_EQUAL(optional->state(), stdc::pluginsystem::PluginSpec::Running);
+}
+
 BOOST_AUTO_TEST_CASE(test_required_and_optional_dependencies) {
     TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
     directory.addPlugin(

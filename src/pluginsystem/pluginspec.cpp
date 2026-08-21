@@ -64,6 +64,15 @@ namespace stdc::pluginsystem {
             return reportError("plugin compatibility version is newer than its version");
         }
 
+        const auto &enabledValue = metadata["enabledByDefault"];
+        if (!enabledValue.isNull()) {
+            if (!enabledValue.isBool()) {
+                return reportError("invalid plugin enabledByDefault value");
+            }
+            enabledByDefault = enabledValue.toBool();
+            enabled = enabledByDefault;
+        }
+
         const auto &dependencyValues = metadata["dependencies"];
         if (!dependencyValues.isNull()) {
             if (!dependencyValues.isArray()) {
@@ -150,6 +159,14 @@ namespace stdc::pluginsystem {
 
     const std::vector<PluginDependency> &PluginSpec::dependencies() const {
         return _data->dependencies;
+    }
+
+    bool PluginSpec::enabledByDefault() const {
+        return _data->enabledByDefault;
+    }
+
+    bool PluginSpec::isEnabled() const {
+        return _data->enabled;
     }
 
     const std::filesystem::path &PluginSpec::filePath() const {

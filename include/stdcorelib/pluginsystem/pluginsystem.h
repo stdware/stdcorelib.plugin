@@ -12,6 +12,7 @@
 #include <stdcorelib/adt/array_view.h>
 
 #include <stdcorelib/pluginsystem/iplugin.h>
+#include <stdcorelib/pluginsystem/pluginsettings.h>
 #include <stdcorelib/pluginsystem/pluginspec.h>
 
 namespace stdc::pluginsystem {
@@ -48,6 +49,12 @@ namespace stdc::pluginsystem {
         /// Calls after loadPlugins() starts have no effect.
         void setPluginPaths(array_view<std::filesystem::path> paths);
         std::vector<std::filesystem::path> pluginPaths() const;
+
+        /// Replaces user enabled-state overrides before loadPlugins() starts.
+        ///
+        /// Calls after loadPlugins() starts have no effect.
+        void setPluginSettings(PluginSettings settings);
+        PluginSettings pluginSettings() const;
 
         /// Returns every discovered spec, preserving each pointer for this system's lifetime.
         std::vector<PluginSpec *> plugins() const;

@@ -92,6 +92,13 @@ namespace stdc::pluginsystem {
         shutdownPlugins();
     }
 
+    void PluginSystem::Impl::applySettings() const {
+        for (auto &item : pluginData) {
+            auto &data = item.second;
+            data.enabled = settings.isPluginEnabled(data.id, data.enabledByDefault);
+        }
+    }
+
     void PluginSystem::Impl::resolveDependencies() {
         resolvedDependencies.clear();
         loadOrder.clear();
@@ -117,7 +124,7 @@ namespace stdc::pluginsystem {
 
         for (auto &item : pluginData) {
             auto &data = item.second;
-            if (data.state != PluginSpec::Read) {
+            if (data.state != PluginSpec::Read || !data.enabled) {
                 continue;
             }
 
@@ -130,6 +137,14 @@ namespace stdc::pluginsystem {
                     if (dependency.type() == PluginDependency::Required) {
                         data.reportError("could not resolve required dependency \"" +
                                          dependency.id() + "\"");
+                        break;
+                    }
+                    continue;
+                }
+                if (!candidate->enabled) {
+                    if (dependency.type() == PluginDependency::Required) {
+                        data.reportError("required dependency \"" + dependency.id() +
+                                         "\" is disabled");
                         break;
                     }
                     continue;
@@ -226,7 +241,8 @@ namespace stdc::pluginsystem {
 
         std::set<PluginSpecData *> added;
         std::function<void(PluginSpecData *)> append = [&](PluginSpecData *data) {
-            if (stdc::contains(added, data) || data->state != PluginSpec::Resolved) {
+            if (stdc::contains(added, data) || !data->enabled ||
+                data->state != PluginSpec::Resolved) {
                 return;
             }
             for (const auto &dependency : resolvedDependencies[data]) {
@@ -270,6 +286,7 @@ namespace stdc::pluginsystem {
         for (auto loader : loaders) {
             pluginData.try_emplace(loader, *loader);
         }
+        applySettings();
 
         std::vector<PluginSpec *> result;
         result.reserve(pluginData.size());
@@ -341,6 +358,22 @@ namespace stdc::pluginsystem {
         stdc_impl_t;
         std::shared_lock<std::shared_mutex> lock(impl.configMtx);
         return impl.factory->pluginPaths(impl.iid);
+    }
+
+    void PluginSystem::setPluginSettings(PluginSettings settings) {
+        stdc_impl_t;
+        std::unique_lock<std::shared_mutex> lock(impl.configMtx);
+        if (impl.loadStarted) {
+            return;
+        }
+        impl.settings = std::move(settings);
+        impl.applySettings();
+    }
+
+    PluginSettings PluginSystem::pluginSettings() const {
+        stdc_impl_t;
+        std::shared_lock<std::shared_mutex> lock(impl.configMtx);
+        return impl.settings;
     }
 
     std::vector<PluginSpec *> PluginSystem::plugins() const {

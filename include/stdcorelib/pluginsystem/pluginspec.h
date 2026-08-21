@@ -50,6 +50,12 @@ namespace stdc::pluginsystem {
         const VersionNumber &compatVersion() const;
         const std::vector<PluginDependency> &dependencies() const;
 
+        /// Whether metadata enables this plugin when settings contain no override.
+        bool enabledByDefault() const;
+
+        /// Whether this plugin was enabled when loadPlugins() froze the plugin set.
+        bool isEnabled() const;
+
         /// The plugin shared library path.
         const std::filesystem::path &filePath() const;
 
