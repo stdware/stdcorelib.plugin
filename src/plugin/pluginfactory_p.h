@@ -22,23 +22,23 @@ namespace stdc {
         PluginFactory *_decl;
 
     public:
-        /// Builds an empty spec this factory owns.
-        static PluginSpec *createSpec();
+        /// Builds an empty loader this factory owns.
+        static PluginLoader *createLoader();
 
         /// Reads any manifest under the directories registered for \a iid that has not been read
         /// already.
         ///
-        /// Scanning only ever adds. A spec that exists may have been handed out and may have been
+        /// Scanning only ever adds. A loader that exists may have been handed out and may have been
         /// loaded, so rescanning must not take it away.
         void scanPlugins(const char *iid) const;
 
         std::map<std::string, vlarray<std::filesystem::path>, std::less<>> pluginPaths;
 
-        /// Every spec, by the extension point it plugs into. The factory owns them all, which is
+        /// Every loader, by the extension point it plugs into. The factory owns them all, which is
         /// what lets \c plugins() hand out bare pointers.
-        mutable std::map<std::string, vlarray<std::unique_ptr<PluginSpec>>, std::less<>> specs;
+        mutable std::map<std::string, vlarray<std::unique_ptr<PluginLoader>>, std::less<>> loaders;
 
-        /// Manifests already turned into a spec, so that a rescan skips them.
+        /// Manifests already turned into a loader, so that a rescan skips them.
         mutable std::set<std::filesystem::path::string_type> readManifests;
 
         mutable std::set<std::string, std::less<>> pluginsDirty;

@@ -16,7 +16,7 @@ namespace stdc {
     /// Base class for all plugins.
     ///
     /// An interface and nothing else. What a plugin is, and where it was found, belongs to the
-    /// \c PluginSpec that produced it, the same way a QObject knows nothing of the QPluginLoader
+    /// \c PluginLoader that produced it, the same way a QObject knows nothing of the QPluginLoader
     /// it came out of.
     class Plugin {
     public:
@@ -45,7 +45,9 @@ namespace stdc {
     /// The process-wide registry of plugins linked into the program.
     using StaticPluginRegistry = StaticRegistry<StaticPlugin>;
 
+#if !defined(STDC_PLUGIN_LIBRARY)
     extern template class STDC_PLUGIN_EXPORT StaticRegistry<StaticPlugin>;
+#endif
 
     /// @}
 

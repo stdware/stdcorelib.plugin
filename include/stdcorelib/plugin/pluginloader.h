@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-#ifndef STDCORELIB_PLUGIN_PLUGINSPEC_H
-#define STDCORELIB_PLUGIN_PLUGINSPEC_H
+#ifndef STDCORELIB_PLUGIN_PLUGINLOADER_H
+#define STDCORELIB_PLUGIN_PLUGINLOADER_H
 
 #include <filesystem>
 #include <memory>
@@ -21,19 +21,19 @@ namespace stdc {
 
     class PluginFactory;
 
-    /// What is known about one plugin before it is loaded.
+    /// Reads, loads, and owns one plugin library.
     ///
-    /// A spec is created for every plugin the factory finds, including the ones it cannot use. A
-    /// plugin whose manifest is malformed, or whose library refuses to load, keeps its spec and
+    /// A loader is created for every plugin the factory finds, including the ones it cannot use. A
+    /// plugin whose manifest is malformed, or whose library refuses to load, keeps its loader and
     /// answers \c hasError(), so the reason can be reported instead of the plugin quietly not
     /// being there.
     ///
-    /// Reading a spec costs one small file. Nothing is loaded until \c load() is called, so the
+    /// Reading a loader costs one small file. Nothing is loaded until \c load() is called, so the
     /// factory can describe every installed plugin without pulling in the libraries they depend
     /// on.
-    class STDC_PLUGIN_EXPORT PluginSpec {
+    class STDC_PLUGIN_EXPORT PluginLoader {
     public:
-        ~PluginSpec();
+        ~PluginLoader();
 
         enum State {
             /// The manifest could not be read. Only \c location() and \c errorString() are
@@ -86,15 +86,15 @@ namespace stdc {
         class Impl;
         std::unique_ptr<Impl> _impl;
 
-        explicit PluginSpec(Impl &impl);
+        explicit PluginLoader(Impl &impl);
 
         friend class PluginFactory;
 
-        STDC_DISABLE_COPY_MOVE(PluginSpec)
+        STDC_DISABLE_COPY_MOVE(PluginLoader)
     };
 
     /// @}
 
 }
 
-#endif // STDCORELIB_PLUGIN_PLUGINSPEC_H
+#endif // STDCORELIB_PLUGIN_PLUGINLOADER_H

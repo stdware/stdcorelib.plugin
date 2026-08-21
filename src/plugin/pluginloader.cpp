@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-#include "pluginspec.h"
-#include "pluginspec_p.h"
+#include "pluginloader.h"
+#include "pluginloader_p.h"
 
 #include <fstream>
 #include <sstream>
@@ -21,23 +21,23 @@ namespace stdc {
     /// rather than half understood.
     static constexpr const char *manifestVersion = "1.0";
 
-    PluginSpec::Impl::Impl(PluginSpec *decl) : _decl(decl) {
+    PluginLoader::Impl::Impl(PluginLoader *decl) : _decl(decl) {
     }
 
-    PluginSpec::Impl::~Impl() {
-        // A library is unloaded with the spec that opened it. Static and runtime plugins are
+    PluginLoader::Impl::~Impl() {
+        // A library is unloaded with the loader that opened it. Static and runtime plugins are
         // owned by whoever registered them and are only borrowed here.
         delete library;
     }
 
-    bool PluginSpec::Impl::reportError(std::string err) {
+    bool PluginLoader::Impl::reportError(std::string err) {
         errorString = std::move(err);
         hasError = true;
-        state = PluginSpec::Invalid;
+        state = PluginLoader::Invalid;
         return false;
     }
 
-    bool PluginSpec::Impl::read(const std::filesystem::path &manifestPath) {
+    bool PluginLoader::Impl::read(const std::filesystem::path &manifestPath) {
         location = manifestPath.parent_path();
 
         std::ifstream file(manifestPath);
@@ -105,15 +105,15 @@ namespace stdc {
             metadata = json::Object();
         }
 
-        state = PluginSpec::Read;
+        state = PluginLoader::Read;
         return true;
     }
 
-    bool PluginSpec::Impl::loadLibrary() {
+    bool PluginLoader::Impl::loadLibrary() {
         if (hasError) {
             return false;
         }
-        if (state == PluginSpec::Loaded) {
+        if (state == PluginLoader::Loaded) {
             return true;
         }
 
@@ -122,7 +122,7 @@ namespace stdc {
             if (!plugin) {
                 return reportError("static plugin produced no instance");
             }
-            state = PluginSpec::Loaded;
+            state = PluginLoader::Loaded;
             return true;
         }
 
@@ -143,56 +143,56 @@ namespace stdc {
         }
 
         library = so.release();
-        state = PluginSpec::Loaded;
+        state = PluginLoader::Loaded;
         return true;
     }
 
-    PluginSpec::PluginSpec(Impl &impl) : _impl(&impl) {
+    PluginLoader::PluginLoader(Impl &impl) : _impl(&impl) {
     }
 
-    PluginSpec::~PluginSpec() = default;
+    PluginLoader::~PluginLoader() = default;
 
-    PluginSpec::State PluginSpec::state() const {
+    PluginLoader::State PluginLoader::state() const {
         stdc_impl_t;
         return impl.state;
     }
 
-    bool PluginSpec::hasError() const {
+    bool PluginLoader::hasError() const {
         stdc_impl_t;
         return impl.hasError;
     }
 
-    const std::string &PluginSpec::errorString() const {
+    const std::string &PluginLoader::errorString() const {
         stdc_impl_t;
         return impl.errorString;
     }
 
-    const std::string &PluginSpec::iid() const {
+    const std::string &PluginLoader::iid() const {
         stdc_impl_t;
         return impl.iid;
     }
 
-    const std::filesystem::path &PluginSpec::location() const {
+    const std::filesystem::path &PluginLoader::location() const {
         stdc_impl_t;
         return impl.location;
     }
 
-    const std::filesystem::path &PluginSpec::filePath() const {
+    const std::filesystem::path &PluginLoader::filePath() const {
         stdc_impl_t;
         return impl.filePath;
     }
 
-    const json::Value &PluginSpec::metadata() const {
+    const json::Value &PluginLoader::metadata() const {
         stdc_impl_t;
         return impl.metadata;
     }
 
-    bool PluginSpec::load() {
+    bool PluginLoader::load() {
         stdc_impl_t;
         return impl.loadLibrary();
     }
 
-    Plugin *PluginSpec::plugin() const {
+    Plugin *PluginLoader::plugin() const {
         stdc_impl_t;
         return impl.plugin;
     }

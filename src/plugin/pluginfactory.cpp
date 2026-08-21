@@ -2,7 +2,7 @@
 
 #include "pluginfactory.h"
 #include "pluginfactory_p.h"
-#include "pluginspec_p.h"
+#include "pluginloader_p.h"
 
 #include <algorithm>
 #include <mutex>
@@ -25,11 +25,11 @@ namespace stdc {
 
     PluginFactory::Impl::~Impl() = default;
 
-    PluginSpec *PluginFactory::Impl::createSpec() {
-        auto specImpl = new PluginSpec::Impl(nullptr);
-        auto spec = new PluginSpec(*specImpl);
-        specImpl->_decl = spec;
-        return spec;
+    PluginLoader *PluginFactory::Impl::createLoader() {
+        auto loaderImpl = new PluginLoader::Impl(nullptr);
+        auto loader = new PluginLoader(*loaderImpl);
+        loaderImpl->_decl = loader;
+        return loader;
     }
 
     void PluginFactory::Impl::scanPlugins(const char *iid) const {
@@ -39,7 +39,7 @@ namespace stdc {
             return;
         }
 
-        auto &known = specs[iid];
+        auto &known = loaders[iid];
         for (const auto &root : it->second) {
             std::error_code ec;
             fs::directory_iterator dir(root, ec);
@@ -67,17 +67,17 @@ namespace stdc {
                     continue;
                 }
 
-                auto spec = createSpec();
-                auto &specImpl = *spec->_impl;
-                if (specImpl.read(canonical) && specImpl.iid != iid) {
+                auto loader = createLoader();
+                auto &loaderImpl = *loader->_impl;
+                if (loaderImpl.read(canonical) && loaderImpl.iid != iid) {
                     // The directory it was found in says one extension point and the manifest
                     // says another. Keep it where it was found so that whoever looks there is
                     // told, rather than filing it where nobody is looking.
-                    specImpl.reportError(formatN(
+                    loaderImpl.reportError(formatN(
                         R"("%1" declares iid "%2", which is not the "%3" it was found under)",
-                        canonical, specImpl.iid, iid));
+                        canonical, loaderImpl.iid, iid));
                 }
-                known.emplace_back(spec);
+                known.emplace_back(loader);
             }
         }
 
@@ -118,21 +118,21 @@ namespace stdc {
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
         for (const StaticPlugin &plugin : staticPlugins(pluginSet)) {
-            auto spec = Impl::createSpec();
-            auto &specImpl = *spec->_impl;
-            specImpl.origin = PluginSpec::Impl::Static;
-            specImpl.staticInstance = plugin.instance;
-            specImpl.metadata = plugin.metadata ? plugin.metadata() : json::Value();
-            specImpl.state = PluginSpec::Read;
+            auto loader = Impl::createLoader();
+            auto &loaderImpl = *loader->_impl;
+            loaderImpl.origin = PluginLoader::Impl::Static;
+            loaderImpl.staticInstance = plugin.instance;
+            loaderImpl.metadata = plugin.metadata ? plugin.metadata() : json::Value();
+            loaderImpl.state = PluginLoader::Read;
 
-            auto iid = specImpl.metadata["iid"];
+            auto iid = loaderImpl.metadata["iid"];
             if (!iid.isString() || iid.toString().empty()) {
-                specImpl.reportError(
+                loaderImpl.reportError(
                     formatN(R"(static plugin in set "%1" declares no iid)", pluginSet));
             } else {
-                specImpl.iid = iid.toString();
+                loaderImpl.iid = iid.toString();
             }
-            impl.specs[specImpl.iid].emplace_back(spec);
+            impl.loaders[loaderImpl.iid].emplace_back(loader);
         }
     }
 
@@ -140,20 +140,20 @@ namespace stdc {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
-        auto spec = Impl::createSpec();
-        auto &specImpl = *spec->_impl;
-        specImpl.origin = PluginSpec::Impl::Runtime;
-        specImpl.metadata = metadata;
-        specImpl.plugin = plugin;
-        specImpl.state = PluginSpec::Loaded;
+        auto loader = Impl::createLoader();
+        auto &loaderImpl = *loader->_impl;
+        loaderImpl.origin = PluginLoader::Impl::Runtime;
+        loaderImpl.metadata = metadata;
+        loaderImpl.plugin = plugin;
+        loaderImpl.state = PluginLoader::Loaded;
 
         auto iid = metadata["iid"];
         if (!iid.isString() || iid.toString().empty()) {
-            specImpl.reportError("runtime plugin declares no iid");
+            loaderImpl.reportError("runtime plugin declares no iid");
         } else {
-            specImpl.iid = iid.toString();
+            loaderImpl.iid = iid.toString();
         }
-        impl.specs[specImpl.iid].emplace_back(spec);
+        impl.loaders[loaderImpl.iid].emplace_back(loader);
     }
 
     void PluginFactory::addPluginPath(const char *iid, const std::filesystem::path &path) {
@@ -196,7 +196,7 @@ namespace stdc {
         return {it->second.begin(), it->second.end()};
     }
 
-    std::vector<PluginSpec *> PluginFactory::plugins(const char *iid) const {
+    std::vector<PluginLoader *> PluginFactory::plugins(const char *iid) const {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
@@ -204,15 +204,15 @@ namespace stdc {
             impl.scanPlugins(iid);
         }
 
-        auto it = impl.specs.find(iid);
-        if (it == impl.specs.end()) {
+        auto it = impl.loaders.find(iid);
+        if (it == impl.loaders.end()) {
             return {};
         }
 
-        std::vector<PluginSpec *> result;
+        std::vector<PluginLoader *> result;
         result.reserve(it->second.size());
-        for (const auto &spec : it->second) {
-            result.push_back(spec.get());
+        for (const auto &loader : it->second) {
+            result.push_back(loader.get());
         }
         return result;
     }

@@ -1,28 +1,28 @@
 // SPDX-License-Identifier: MIT
 
-#ifndef STDCORELIB_PLUGIN_PLUGINSPEC_P_H
-#define STDCORELIB_PLUGIN_PLUGINSPEC_P_H
+#ifndef STDCORELIB_PLUGIN_PLUGINLOADER_P_H
+#define STDCORELIB_PLUGIN_PLUGINLOADER_P_H
 
 #include <stdcorelib/support/sharedlibrary.h>
 
 #include <stdcorelib/plugin/plugin.h>
-#include <stdcorelib/plugin/pluginspec.h>
+#include <stdcorelib/plugin/pluginloader.h>
 
 namespace stdc {
 
-    class PluginSpec::Impl {
+    class PluginLoader::Impl {
     public:
-        explicit Impl(PluginSpec *decl);
+        explicit Impl(PluginLoader *decl);
         ~Impl();
 
-        using Decl = PluginSpec;
-        PluginSpec *_decl;
+        using Decl = PluginLoader;
+        PluginLoader *_decl;
 
     public:
         /// Where the instance is meant to come from.
         ///
         /// The three differ only in what \c loadLibrary() has to do, so everything downstream of
-        /// a spec treats them alike.
+        /// a loader treats them alike.
         enum Origin {
             /// A shared library sitting next to the manifest that described it.
             FileSystem,
@@ -36,7 +36,7 @@ namespace stdc {
 
         Origin origin = FileSystem;
 
-        PluginSpec::State state = PluginSpec::Invalid;
+        PluginLoader::State state = PluginLoader::Invalid;
         bool hasError = false;
         std::string errorString;
 
@@ -66,4 +66,4 @@ namespace stdc {
 
 }
 
-#endif // STDCORELIB_PLUGIN_PLUGINSPEC_P_H
+#endif // STDCORELIB_PLUGIN_PLUGINLOADER_P_H

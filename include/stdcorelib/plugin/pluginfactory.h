@@ -10,7 +10,7 @@
 #include <stdcorelib/adt/array_view.h>
 #include <stdcorelib/stdc_global.h>
 
-#include <stdcorelib/plugin/pluginspec.h>
+#include <stdcorelib/plugin/pluginloader.h>
 
 namespace stdc {
 
@@ -67,10 +67,10 @@ namespace stdc {
         /// Everything found for \a iid, scanning the registered directories if they have not been
         /// scanned since they last changed.
         ///
-        /// Nothing is loaded. The specs of plugins that could not be read are returned along with
+        /// Nothing is loaded. Loaders for plugins that could not be read are returned along with
         /// the rest, carrying the reason, so that a caller which finds no match can say whether
         /// the plugin it wanted is missing or merely broken.
-        std::vector<PluginSpec *> plugins(const char *iid) const;
+        std::vector<PluginLoader *> plugins(const char *iid) const;
 
     protected:
         class Impl;
