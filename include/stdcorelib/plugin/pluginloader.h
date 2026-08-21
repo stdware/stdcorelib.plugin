@@ -59,6 +59,10 @@ namespace stdc::plugin {
         /// Selects another plugin library and reads its metadata without loading its code.
         ///
         /// An already loaded library is unloaded first.
+        ///
+        /// \param filePath The plugin library to select.
+        /// \param metadataPath An external metadata JSON file, or empty to read metadata embedded
+        ///                     in the plugin library.
         void setFilePath(const std::filesystem::path &filePath,
                          const std::optional<std::filesystem::path> &metadataPath = {});
 
