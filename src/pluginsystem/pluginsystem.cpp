@@ -145,22 +145,27 @@ namespace stdc::pluginsystem {
             }
         }
 
-        std::map<PluginSpecData *, int> colors;
+        enum class VisitState {
+            NotVisited,
+            Visiting,
+            Visited,
+        };
+        std::map<PluginSpecData *, VisitState> visitStates;
         std::vector<PluginSpecData *> stack;
         std::map<PluginSpecData *, std::string> cycleErrors;
         std::function<void(PluginSpecData *)> findCycles = [&](PluginSpecData *data) {
-            colors[data] = 1;
+            visitStates[data] = VisitState::Visiting;
             stack.push_back(data);
             for (const auto &dependency : resolvedDependencies[data]) {
                 auto next = dependency.data;
                 if (next->state != PluginSpec::Resolved) {
                     continue;
                 }
-                if (colors[next] == 0) {
+                if (visitStates[next] == VisitState::NotVisited) {
                     findCycles(next);
                     continue;
                 }
-                if (colors[next] != 1) {
+                if (visitStates[next] != VisitState::Visiting) {
                     continue;
                 }
 
@@ -178,12 +183,13 @@ namespace stdc::pluginsystem {
                 }
             }
             stack.pop_back();
-            colors[data] = 2;
+            visitStates[data] = VisitState::Visited;
         };
 
         for (auto &item : pluginData) {
             auto &data = item.second;
-            if (data.state == PluginSpec::Resolved && colors[&data] == 0) {
+            if (data.state == PluginSpec::Resolved &&
+                visitStates[&data] == VisitState::NotVisited) {
                 findCycles(&data);
             }
         }
