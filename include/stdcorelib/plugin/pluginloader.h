@@ -43,6 +43,15 @@ namespace stdc::plugin {
         PluginLoader(PluginLoader &&RHS) noexcept;
         PluginLoader &operator=(PluginLoader &&RHS) noexcept;
 
+        enum Origin {
+            /// A shared library on the filesystem.
+            FileSystem,
+            /// A plugin linked into the program.
+            Static,
+            /// A live instance supplied by the program.
+            Runtime,
+        };
+
         enum State {
             /// No plugin has been selected.
             Null,
@@ -74,6 +83,7 @@ namespace stdc::plugin {
         void setPlugin(Plugin *plugin, const json::Value &metadata);
 
         State state() const;
+        Origin origin() const;
         bool hasError() const;
 
         /// Why this plugin is unusable, empty if it is not.

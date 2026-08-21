@@ -23,6 +23,7 @@ BOOST_AUTO_TEST_CASE(test_embedded_metadata_and_load) {
     stdc::plugin::PluginLoader loader(TEST_PLUGINLOADER_PLUGIN_PATH);
 
     BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Read);
+    BOOST_CHECK_EQUAL(loader.origin(), stdc::plugin::PluginLoader::FileSystem);
     BOOST_CHECK(!loader.hasError());
     BOOST_CHECK(!loader.plugin());
     BOOST_CHECK_EQUAL(loader.iid(), "org.stdcorelib.LoaderTest");
@@ -30,6 +31,7 @@ BOOST_AUTO_TEST_CASE(test_embedded_metadata_and_load) {
 
     BOOST_REQUIRE_MESSAGE(loader.load(), loader.errorMessage());
     BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Loaded);
+    BOOST_CHECK_EQUAL(loader.origin(), stdc::plugin::PluginLoader::FileSystem);
     BOOST_CHECK(loader.isLoaded());
     BOOST_CHECK(loader.plugin());
 
@@ -57,6 +59,7 @@ BOOST_AUTO_TEST_CASE(test_runtime_plugin) {
     stdc::plugin::PluginLoader loader(&plugin, metadata);
 
     BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Loaded);
+    BOOST_CHECK_EQUAL(loader.origin(), stdc::plugin::PluginLoader::Runtime);
     BOOST_CHECK(loader.isLoaded());
     BOOST_CHECK_EQUAL(loader.plugin(), &plugin);
     BOOST_CHECK_EQUAL(loader.iid(), "org.stdcorelib.RuntimeTest");

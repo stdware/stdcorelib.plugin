@@ -43,4 +43,13 @@ BOOST_AUTO_TEST_CASE(test_registry) {
     BOOST_CHECK_EQUAL(plugins.front().metadata()["iid"].toString(), "org.stdcorelib.Test");
 }
 
+BOOST_AUTO_TEST_CASE(test_loader_origin) {
+    stdc::plugin::PluginFactory factory;
+    factory.addStaticPlugins("test");
+
+    const auto plugins = factory.plugins("org.stdcorelib.Test");
+    BOOST_REQUIRE_EQUAL(plugins.size(), 1u);
+    BOOST_CHECK_EQUAL(plugins.front()->origin(), stdc::plugin::PluginLoader::Static);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

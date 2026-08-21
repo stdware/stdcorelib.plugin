@@ -99,7 +99,7 @@ namespace stdc::plugin {
         for (const StaticPlugin &plugin : PluginLoader::staticPlugins(pluginSet)) {
             auto loader = Impl::createLoader();
             auto &loaderImpl = *loader->_impl;
-            loaderImpl.origin = PluginLoader::Impl::Static;
+            loaderImpl.origin = PluginLoader::Static;
             loaderImpl.staticInstance = plugin.instance;
             loaderImpl.metadata = plugin.metadata ? plugin.metadata() : json::Value();
             loaderImpl.state = PluginLoader::Read;

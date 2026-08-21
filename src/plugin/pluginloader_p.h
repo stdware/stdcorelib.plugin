@@ -17,21 +17,7 @@ namespace stdc::plugin {
         Impl();
         ~Impl();
 
-    public:
-        /// Where the instance is meant to come from.
-        ///
-        /// The three differ only in what \c loadLibrary() has to do, so everything downstream of
-        /// a loader treats them alike.
-        enum Origin {
-            /// A shared library sitting next to the manifest that described it.
-            FileSystem,
-            /// Linked into the program, handing over its metadata rather than writing it down.
-            Static,
-            /// An instance the program built and handed over, already live.
-            Runtime,
-        };
-
-        Origin origin = FileSystem;
+        PluginLoader::Origin origin = PluginLoader::FileSystem;
 
         PluginLoader::State state = PluginLoader::Null;
         bool hasError = false;

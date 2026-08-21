@@ -36,7 +36,7 @@ namespace stdc::plugin {
         iid.clear();
         filePath.clear();
         metadata = json::Value();
-        origin = FileSystem;
+        origin = PluginLoader::FileSystem;
         staticInstance = nullptr;
     }
 
@@ -167,7 +167,7 @@ namespace stdc::plugin {
     bool PluginLoader::Impl::setRuntimePlugin(Plugin *runtimePlugin,
                                               const json::Value &runtimeMetadata) {
         reset();
-        origin = Runtime;
+        origin = PluginLoader::Runtime;
         metadata = runtimeMetadata;
 
         auto runtimeIid = metadata["iid"];
@@ -192,7 +192,7 @@ namespace stdc::plugin {
             return true;
         }
 
-        if (origin == Static) {
+        if (origin == PluginLoader::Static) {
             plugin = staticInstance ? staticInstance() : nullptr;
             if (!plugin) {
                 return reportError("static plugin produced no instance", PluginLoader::LoadFailed);
@@ -229,7 +229,7 @@ namespace stdc::plugin {
     }
 
     bool PluginLoader::Impl::unloadLibrary() {
-        if (state != PluginLoader::Loaded || origin != FileSystem) {
+        if (state != PluginLoader::Loaded || origin != PluginLoader::FileSystem) {
             return state != PluginLoader::Loaded;
         }
         if (!library->close()) {
@@ -276,6 +276,11 @@ namespace stdc::plugin {
     PluginLoader::State PluginLoader::state() const {
         stdc_impl_t;
         return impl.state;
+    }
+
+    PluginLoader::Origin PluginLoader::origin() const {
+        stdc_impl_t;
+        return impl.origin;
     }
 
     bool PluginLoader::hasError() const {
