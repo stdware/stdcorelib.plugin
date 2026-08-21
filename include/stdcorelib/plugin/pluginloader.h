@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -42,10 +43,14 @@ namespace stdc::plugin {
         PluginLoader &operator=(PluginLoader &&RHS) noexcept;
 
         enum State {
+            /// No plugin has been selected.
+            Null,
             /// The manifest could not be read. Only \c errorMessage() is meaningful.
             Invalid,
             /// The metadata has been read. Everything but \c plugin() is meaningful.
             Read,
+            /// The metadata was read, but the plugin could not be loaded.
+            LoadFailed,
             /// The library is loaded and \c plugin() is live.
             Loaded,
         };
@@ -54,7 +59,8 @@ namespace stdc::plugin {
         /// Selects another plugin library and reads its metadata without loading its code.
         ///
         /// An already loaded library is unloaded first.
-        void setFilePath(const std::filesystem::path &filePath);
+        void setFilePath(const std::filesystem::path &filePath,
+                         const std::optional<std::filesystem::path> &metadataPath = {});
 
         State state() const;
         bool hasError() const;
@@ -63,7 +69,7 @@ namespace stdc::plugin {
         const std::string &errorMessage() const;
 
     public:
-        /// The extension point this plugin plugs into, such as \c org.openvpi.InferenceInterpreter.
+        /// The extension point this plugin plugs into, such as \c org.foo.bar.
         ///
         /// \note This is the only part of the manifest the factory interprets. Whoever owns the
         ///       extension point decides what the rest of it means.

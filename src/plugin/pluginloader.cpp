@@ -30,7 +30,7 @@ namespace stdc::plugin {
     void PluginLoader::Impl::reset() {
         library.reset();
         plugin = nullptr;
-        state = PluginLoader::Invalid;
+        state = PluginLoader::Null;
         hasError = false;
         errorMessage.clear();
         iid.clear();
@@ -40,10 +40,10 @@ namespace stdc::plugin {
         staticInstance = nullptr;
     }
 
-    bool PluginLoader::Impl::reportError(std::string err) {
+    bool PluginLoader::Impl::reportError(std::string err, PluginLoader::State errorState) {
         errorMessage = std::move(err);
         hasError = true;
-        state = PluginLoader::Invalid;
+        state = errorState;
         return false;
     }
 
@@ -65,26 +65,25 @@ namespace stdc::plugin {
         return readMetadata(root, manifestPath);
     }
 
-    bool PluginLoader::Impl::readLibrary(const std::filesystem::path &libraryPath) {
+    bool PluginLoader::Impl::readLibrary(const std::filesystem::path &libraryPath,
+                                         const std::optional<std::filesystem::path> &metadataPath) {
         reset();
         filePath = fs::absolute(libraryPath);
         if (!fs::is_regular_file(filePath)) {
             return reportError(formatN(R"(%1: is not a regular file)", filePath));
         }
 
-#ifdef _WIN32
-        auto overridePath = filePath.parent_path() / (filePath.stem().native() + L".plugin.json");
-#else
-        auto overridePath = filePath.parent_path() / (filePath.stem().string() + ".plugin.json");
-#endif
         std::string text;
         std::filesystem::path sourcePath = filePath;
-        if (fs::is_regular_file(overridePath)) {
-            std::ifstream file(overridePath);
+        if (metadataPath) {
+            sourcePath = fs::absolute(*metadataPath);
+            std::ifstream file(sourcePath);
+            if (!file.is_open()) {
+                return reportError(formatN(R"(failed to open "%1")", sourcePath));
+            }
             std::stringstream ss;
             ss << file.rdbuf();
             text = ss.str();
-            sourcePath = overridePath;
         } else {
             std::string readError;
             if (!readEmbeddedMetadata(filePath, &text, &readError)) {
@@ -176,7 +175,7 @@ namespace stdc::plugin {
         if (origin == Static) {
             plugin = staticInstance ? staticInstance() : nullptr;
             if (!plugin) {
-                return reportError("static plugin produced no instance");
+                return reportError("static plugin produced no instance", PluginLoader::LoadFailed);
             }
             state = PluginLoader::Loaded;
             return true;
@@ -186,7 +185,7 @@ namespace stdc::plugin {
         if (!library->open(filePath, SharedLibrary::SearchLibraryLoadDirectoryHint)) {
             auto message = library->errorMessage();
             library.reset();
-            return reportError(formatN(R"(%1: %2)", filePath, message));
+            return reportError(formatN(R"(%1: %2)", filePath, message), PluginLoader::LoadFailed);
         }
 
         auto getter =
@@ -194,13 +193,15 @@ namespace stdc::plugin {
         if (!getter) {
             library.reset();
             return reportError(
-                formatN(R"(%1: does not export "%2")", filePath, STDC_PLUGIN_INSTANCE_SYMBOL));
+                formatN(R"(%1: does not export "%2")", filePath, STDC_PLUGIN_INSTANCE_SYMBOL),
+                PluginLoader::LoadFailed);
         }
 
         plugin = getter();
         if (!plugin) {
             library.reset();
-            return reportError(formatN(R"(%1: exported no instance)", filePath));
+            return reportError(formatN(R"(%1: exported no instance)", filePath),
+                               PluginLoader::LoadFailed);
         }
 
         state = PluginLoader::Loaded;
@@ -222,7 +223,7 @@ namespace stdc::plugin {
         return true;
     }
 
-    PluginLoader::PluginLoader() : _impl(new Impl) {
+    PluginLoader::PluginLoader() : _impl(new Impl()) {
     }
 
     PluginLoader::PluginLoader(const std::filesystem::path &filePath) : PluginLoader() {
@@ -235,9 +236,10 @@ namespace stdc::plugin {
 
     PluginLoader &PluginLoader::operator=(PluginLoader &&RHS) noexcept = default;
 
-    void PluginLoader::setFilePath(const std::filesystem::path &filePath) {
+    void PluginLoader::setFilePath(const std::filesystem::path &filePath,
+                                   const std::optional<std::filesystem::path> &metadataPath) {
         stdc_impl_t;
-        impl.readLibrary(filePath);
+        impl.readLibrary(filePath, metadataPath);
     }
 
     PluginLoader::State PluginLoader::state() const {

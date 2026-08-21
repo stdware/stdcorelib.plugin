@@ -27,6 +27,7 @@ endif()
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     TEST_PLUGINLOADER_PLUGIN_PATH="$<TARGET_FILE:pluginloader_test_plugin>"
+    TEST_PLUGINLOADER_METADATA_PATH="${CMAKE_CURRENT_SOURCE_DIR}/pluginloader_test_plugin.json"
 )
 add_dependencies(${PROJECT_NAME} pluginloader_test_plugin)
 

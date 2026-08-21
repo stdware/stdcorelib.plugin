@@ -33,7 +33,7 @@ namespace stdc::plugin {
 
         Origin origin = FileSystem;
 
-        PluginLoader::State state = PluginLoader::Invalid;
+        PluginLoader::State state = PluginLoader::Null;
         bool hasError = false;
         std::string errorMessage;
 
@@ -53,7 +53,8 @@ namespace stdc::plugin {
         /// Failure is recorded rather than thrown away, so that a plugin which is installed but
         /// unusable still shows up with a reason attached.
         bool read(const std::filesystem::path &manifestPath);
-        bool readLibrary(const std::filesystem::path &libraryPath);
+        bool readLibrary(const std::filesystem::path &libraryPath,
+                         const std::optional<std::filesystem::path> &metadataPath = {});
         bool readMetadata(const json::Value &root, const std::filesystem::path &sourcePath,
                           const std::filesystem::path &boundFilePath = {});
 
@@ -66,7 +67,7 @@ namespace stdc::plugin {
         bool unloadLibrary();
 
         /// Records \a err and returns false, so a check can be written as one line.
-        bool reportError(std::string err);
+        bool reportError(std::string err, PluginLoader::State errorState = PluginLoader::Invalid);
     };
 
 }
