@@ -19,13 +19,6 @@ add_library(pluginloader_test_plugin MODULE ${_plugin_dir}/pluginloader_test_plu
 target_link_libraries(pluginloader_test_plugin PRIVATE stdcorelib::plugin)
 set_target_properties(pluginloader_test_plugin PROPERTIES PREFIX "")
 
-if(WIN32)
-    target_sources(pluginloader_test_plugin PRIVATE ${_plugin_dir}/pluginloader_test_plugin.rc)
-    set_property(SOURCE ${_plugin_dir}/pluginloader_test_plugin.rc PROPERTY OBJECT_DEPENDS
-        ${_plugin_dir}/pluginloader_test_plugin.json
-    )
-endif()
-
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     TEST_PLUGINLOADER_PLUGIN_PATH="$<TARGET_FILE:pluginloader_test_plugin>"
     TEST_PLUGINLOADER_METADATA_PATH="${_plugin_dir}/pluginloader_test_plugin.json"

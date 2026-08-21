@@ -1,3 +1,0 @@
-#include <windows.h>
-
-stdc_metadata RCDATA "pluginloader_test_plugin.json"

@@ -73,6 +73,21 @@ extern template class STDC_PLUGIN_EXPORT stdc::StaticRegistry<stdc::plugin::Stat
 /// The symbol a plugin library exports, as a string, for whoever has to resolve it.
 #define STDC_PLUGIN_INSTANCE_SYMBOL "stdc_plugin_instance"
 
+/// Places a byte array in the section inspected by \c PluginLoader for embedded metadata.
+///
+/// The array must contain a complete plugin metadata JSON document. Give the array external
+/// linkage or otherwise make sure the linker retains it in the finished plugin library.
+#if defined(_WIN32) && defined(_MSC_VER)
+#  pragma section(".stdcmd", read, shared)
+#  define STDC_PLUGIN_METADATA_SECTION __declspec(allocate(".stdcmd"))
+#elif defined(_WIN32)
+#  define STDC_PLUGIN_METADATA_SECTION __attribute__((section(".stdcmd"), used))
+#elif defined(__APPLE__)
+#  define STDC_PLUGIN_METADATA_SECTION __attribute__((section("__TEXT,stdc_metadata"), used))
+#else
+#  define STDC_PLUGIN_METADATA_SECTION __attribute__((section(".stdc_metadata"), used))
+#endif
+
 /// Exports \a PLUGIN_NAME from a shared library. The plugin.json beside it says the rest.
 #define STDC_EXPORT_PLUGIN(PLUGIN_NAME)                                                            \
     extern "C" STDC_DECL_EXPORT stdc::plugin::Plugin *stdc_plugin_instance() {                     \

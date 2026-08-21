@@ -10,18 +10,8 @@ namespace {
 
 STDC_EXPORT_PLUGIN(LoaderTestPlugin)
 
-#if !defined(_WIN32)
-
-#  if defined(__APPLE__)
-#    define STDC_TEST_METADATA_SECTION __attribute__((section("__TEXT,stdc_metadata")))
-#  else
-#    define STDC_TEST_METADATA_SECTION __attribute__((section(".stdc_metadata")))
-#  endif
-
-STDC_TEST_METADATA_SECTION __attribute__((used)) static constexpr char metadata[] = R"({
+extern "C" STDC_DECL_EXPORT STDC_PLUGIN_METADATA_SECTION const char stdc_plugin_metadata[] = R"({
     "$version": "1.0",
     "iid": "org.stdcorelib.LoaderTest",
     "metadata": {"answer": 42}
 })";
-
-#endif
