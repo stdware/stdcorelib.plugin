@@ -14,6 +14,9 @@
 
 namespace stdc::pluginsystem {
 
+    /// \addtogroup plugin
+    /// @{
+
     class IPlugin;
 
     class PluginSpecData;
@@ -89,6 +92,8 @@ namespace stdc::pluginsystem {
 
         STDC_DISABLE_COPY_MOVE(PluginSpec)
     };
+
+    /// @}
 
 }
 

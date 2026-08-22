@@ -15,6 +15,9 @@
 
 namespace stdc::pluginsystem {
 
+    /// \addtogroup plugin
+    /// @{
+
     /// One source of plugin enabled-state overrides and application-defined data.
     class STDC_PLUGIN_EXPORT PluginSettings {
     public:
@@ -66,6 +69,8 @@ namespace stdc::pluginsystem {
     inline const json::Object &PluginSettings::userData() const {
         return _userData;
     }
+
+    /// @}
 
 }
 

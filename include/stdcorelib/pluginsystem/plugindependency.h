@@ -12,6 +12,9 @@
 
 namespace stdc::pluginsystem {
 
+    /// \addtogroup plugin
+    /// @{
+
     /// One versioned dependency declared by a PluginSystem plugin.
     class STDC_PLUGIN_EXPORT PluginDependency {
     public:
@@ -47,6 +50,8 @@ namespace stdc::pluginsystem {
         VersionNumber _version;
         Type _type;
     };
+
+    /// @}
 
 }
 

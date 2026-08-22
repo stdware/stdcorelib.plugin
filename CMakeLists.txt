@@ -158,10 +158,16 @@ if(STDC_PLUGIN_INSTALL)
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}" OPTIONAL
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" OPTIONAL
     )
+    if(WIN32)
+        set(_debug_symbols_dir "${CMAKE_INSTALL_BINDIR}")
+    else()
+        set(_debug_symbols_dir "${CMAKE_INSTALL_LIBDIR}")
+    endif()
+    stdc_add_install_pdb_rule(${PROJECT_NAME} DESTINATION "${_debug_symbols_dir}")
 
     set(_install_dir ${CMAKE_INSTALL_LIBDIR}/cmake/${STDC_PLUGIN_INSTALL_NAME})
 
-    stdc_add_install_rule(
+    stdc_add_install_package_rule(
         NAME ${STDC_PLUGIN_INSTALL_NAME}
         VERSION ${PROJECT_VERSION}
         COMPATIBILITY SameMajorVersion

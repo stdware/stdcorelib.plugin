@@ -9,6 +9,9 @@
 
 namespace stdc::pluginsystem {
 
+    /// \addtogroup plugin
+    /// @{
+
     /// The lifecycle interface implemented by a PluginSystem plugin.
     class STDC_PLUGIN_EXPORT IPlugin : public plugin::Plugin {
     public:
@@ -26,6 +29,8 @@ namespace stdc::pluginsystem {
         /// Notifies this plugin during shutdown before any plugin library is unloaded.
         virtual void aboutToShutdown();
     };
+
+    /// @}
 
 }
 

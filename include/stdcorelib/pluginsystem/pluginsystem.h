@@ -17,6 +17,9 @@
 
 namespace stdc::pluginsystem {
 
+    /// \addtogroup plugin
+    /// @{
+
     /// Discovers and manages plugins implementing the PluginSystem lifecycle.
     class STDC_PLUGIN_EXPORT PluginSystem {
     public:
@@ -96,6 +99,8 @@ namespace stdc::pluginsystem {
 
         STDC_DISABLE_COPY(PluginSystem)
     };
+
+    /// @}
 
 }
 
