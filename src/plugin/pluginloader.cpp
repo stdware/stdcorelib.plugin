@@ -82,11 +82,32 @@ namespace stdc::plugin {
         return readManifest(root, sourcePath, filePath);
     }
 
+    bool PluginLoader::Impl::validateManifest(const json::Value &root, std::string_view source,
+                                              std::string *validatedIid) {
+        if (!root.isObject()) {
+            return reportError(formatN(R"(%1: not a JSON object)", source));
+        }
+        const auto &obj = root.toObject();
+
+        auto iidIt = obj.find("iid");
+        if (iidIt == obj.end() || !iidIt->second.isString() || iidIt->second.toString().empty()) {
+            return reportError(formatN(R"(%1: missing or invalid "iid" field)", source));
+        }
+
+        if (auto it = obj.find("metadata"); it != obj.end() && !it->second.isObject()) {
+            return reportError(formatN(R"(%1: "metadata" field is not an object)", source));
+        }
+
+        *validatedIid = iidIt->second.toString();
+        return true;
+    }
+
     bool PluginLoader::Impl::readManifest(const json::Value &root,
                                           const std::filesystem::path &sourcePath,
                                           const std::filesystem::path &boundFilePath) {
-        if (!root.isObject()) {
-            return reportError(formatN(R"(%1: not a JSON object)", sourcePath));
+        std::string validatedIid;
+        if (!validateManifest(root, formatN("%1", sourcePath), &validatedIid)) {
+            return false;
         }
         const auto &obj = root.toObject();
 
@@ -99,12 +120,6 @@ namespace stdc::plugin {
             *out = it->second.toString();
             return !out->empty();
         };
-
-        std::string_view iid_;
-        if (!stringField("iid", &iid_)) {
-            return reportError(formatN(R"(%1: missing or invalid "iid" field)", sourcePath));
-        }
-        iid = iid_;
 
         std::string_view binary;
         if (boundFilePath.empty()) {
@@ -120,13 +135,7 @@ namespace stdc::plugin {
                 formatN(R"(%1: "binary" names "%2", which is not there)", sourcePath, filePath));
         }
 
-        // Whatever is in here belongs to the extension point named by iid. Check that it is an
-        // object and leave the complete manifest alone otherwise.
-        if (auto it = obj.find("metadata"); it != obj.end()) {
-            if (!it->second.isObject()) {
-                return reportError(formatN(R"(%1: "metadata" field is not an object)", sourcePath));
-            }
-        }
+        iid = std::move(validatedIid);
         manifest = root;
 
         state = PluginLoader::Read;
@@ -139,12 +148,12 @@ namespace stdc::plugin {
         staticInstance = staticPlugin.instance;
         manifest = staticPlugin.manifest ? staticPlugin.manifest() : json::Value();
 
-        auto staticIid = manifest["iid"];
-        if (!staticIid.isString() || staticIid.toString().empty()) {
-            return reportError("static plugin declares no iid");
+        std::string validatedIid;
+        if (!validateManifest(manifest, "static plugin", &validatedIid)) {
+            return false;
         }
 
-        iid = staticIid.toString();
+        iid = std::move(validatedIid);
         state = PluginLoader::Read;
         return true;
     }
@@ -155,15 +164,15 @@ namespace stdc::plugin {
         origin = PluginLoader::Runtime;
         manifest = runtimeManifest;
 
-        auto runtimeIid = manifest["iid"];
-        if (!runtimeIid.isString() || runtimeIid.toString().empty()) {
-            return reportError("runtime plugin declares no iid");
+        std::string validatedIid;
+        if (!validateManifest(manifest, "runtime plugin", &validatedIid)) {
+            return false;
         }
-        iid = runtimeIid.toString();
         if (!runtimePlugin) {
             return reportError("runtime plugin instance is null");
         }
 
+        iid = std::move(validatedIid);
         plugin = runtimePlugin;
         state = PluginLoader::Loaded;
         return true;

@@ -26,6 +26,8 @@ namespace {
 
     class InvalidStaticPlugin : public stdc::plugin::Plugin {};
 
+    class InvalidMetadataStaticPlugin : public stdc::plugin::Plugin {};
+
 }
 
 STDC_EXPORT_STATIC_PLUGIN(TestStaticPlugin, "test",
@@ -35,6 +37,12 @@ STDC_EXPORT_STATIC_PLUGIN(TestStaticPlugin, "test",
 }))
 
 STDC_EXPORT_STATIC_PLUGIN(InvalidStaticPlugin, "invalid", (stdc::json::Object{}))
+
+STDC_EXPORT_STATIC_PLUGIN(InvalidMetadataStaticPlugin, "invalid-metadata",
+                          (stdc::json::Object{
+                              {"iid",      "org.stdcorelib.InvalidMetadata"},
+                              {"metadata", 42                               },
+}))
 
 BOOST_AUTO_TEST_SUITE(test_staticplugin)
 
@@ -77,6 +85,19 @@ BOOST_AUTO_TEST_CASE(test_factory_ignores_static_plugin_without_iid) {
     factory.addStaticPlugins("invalid");
 
     BOOST_CHECK(factory.plugins("").empty());
+}
+
+BOOST_AUTO_TEST_CASE(test_static_manifest_requires_object_metadata) {
+    const auto staticPlugins = stdc::plugin::PluginLoader::staticPlugins("invalid-metadata");
+    BOOST_REQUIRE_EQUAL(staticPlugins.size(), 1u);
+
+    const stdc::plugin::PluginLoader loader(staticPlugins.front());
+
+    BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Invalid);
+    BOOST_CHECK_EQUAL(loader.origin(), stdc::plugin::PluginLoader::Static);
+    BOOST_CHECK(loader.hasError());
+    BOOST_CHECK(loader.errorMessage().find("metadata") != std::string::npos);
+    BOOST_CHECK(!loader.plugin());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

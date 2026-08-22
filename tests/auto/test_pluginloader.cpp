@@ -148,6 +148,22 @@ BOOST_AUTO_TEST_CASE(test_runtime_plugin) {
     BOOST_CHECK(!loader.hasError());
 }
 
+BOOST_AUTO_TEST_CASE(test_runtime_manifest_requires_object_metadata) {
+    RuntimePlugin plugin;
+    const stdc::json::Value manifest = stdc::json::Object{
+        {"iid",      "org.stdcorelib.RuntimeTest"},
+        {"metadata", 42                           },
+    };
+
+    const stdc::plugin::PluginLoader loader(&plugin, manifest);
+
+    BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Invalid);
+    BOOST_CHECK_EQUAL(loader.origin(), stdc::plugin::PluginLoader::Runtime);
+    BOOST_CHECK(loader.hasError());
+    BOOST_CHECK(loader.errorMessage().find("metadata") != std::string::npos);
+    BOOST_CHECK(!loader.plugin());
+}
+
 BOOST_AUTO_TEST_CASE(test_load_failed) {
     stdc::plugin::PluginLoader loader;
     loader.setFilePath(TEST_PLUGINLOADER_MANIFEST_PATH, TEST_PLUGINLOADER_MANIFEST_PATH);
