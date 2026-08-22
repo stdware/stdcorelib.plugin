@@ -8,7 +8,6 @@
 #include <sstream>
 #include <utility>
 
-#include <stdcorelib/path.h>
 #include <stdcorelib/pimpl.h>
 #include <stdcorelib/str.h>
 
@@ -79,7 +78,7 @@ namespace stdc::plugin {
         if (parseError) {
             return reportError(formatN(R"(%1: %2)", sourcePath, parseError.message()));
         }
-        return readManifest(root, sourcePath, filePath);
+        return readManifest(root, sourcePath);
     }
 
     bool PluginLoader::Impl::validateManifest(const json::Value &root, std::string_view source,
@@ -103,36 +102,10 @@ namespace stdc::plugin {
     }
 
     bool PluginLoader::Impl::readManifest(const json::Value &root,
-                                          const std::filesystem::path &sourcePath,
-                                          const std::filesystem::path &boundFilePath) {
+                                          const std::filesystem::path &sourcePath) {
         std::string validatedIid;
         if (!validateManifest(root, formatN("%1", sourcePath), &validatedIid)) {
             return false;
-        }
-        const auto &obj = root.toObject();
-
-        const auto stringField = [&obj](const std::string_view &key,
-                                        std::string_view *out) -> bool {
-            auto it = obj.find(key);
-            if (it == obj.end() || !it->second.isString()) {
-                return false;
-            }
-            *out = it->second.toString();
-            return !out->empty();
-        };
-
-        std::string_view binary;
-        if (boundFilePath.empty()) {
-            if (!stringField("binary", &binary)) {
-                return reportError(formatN(R"(%1: missing or invalid "binary" field)", sourcePath));
-            }
-            filePath = sourcePath.parent_path() / path::from_utf8(binary);
-        } else {
-            filePath = boundFilePath;
-        }
-        if (!fs::is_regular_file(filePath)) {
-            return reportError(
-                formatN(R"(%1: "binary" names "%2", which is not there)", sourcePath, filePath));
         }
 
         iid = std::move(validatedIid);

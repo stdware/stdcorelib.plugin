@@ -107,9 +107,6 @@ namespace stdc::plugin {
     PluginFactory::PluginFactory() : _impl(std::make_unique<Impl>()) {
     }
 
-    PluginFactory::PluginFactory(Impl &impl) : _impl(&impl) {
-    }
-
     PluginFactory::~PluginFactory() = default;
 
     PluginFactory::PluginFactory(PluginFactory &&RHS) noexcept = default;

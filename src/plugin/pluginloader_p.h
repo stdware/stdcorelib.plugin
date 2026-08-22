@@ -38,8 +38,7 @@ namespace stdc::plugin {
                          const std::optional<std::filesystem::path> &manifestPath = {});
         bool validateManifest(const json::Value &root, std::string_view source,
                               std::string *validatedIid);
-        bool readManifest(const json::Value &root, const std::filesystem::path &sourcePath,
-                          const std::filesystem::path &boundFilePath = {});
+        bool readManifest(const json::Value &root, const std::filesystem::path &sourcePath);
         bool setStaticPlugin(const StaticPlugin &plugin);
         bool setRuntimePlugin(Plugin *plugin, const json::Value &manifest);
 

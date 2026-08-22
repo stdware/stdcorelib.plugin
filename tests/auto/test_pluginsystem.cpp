@@ -53,7 +53,7 @@ namespace {
             std::filesystem::copy_file(source, pluginPath);
 
             std::ofstream manifest(pluginDirectory / "plugin.json");
-            manifest << R"({"iid":")" << iid << R"(","binary":")" << source.filename().string()
+            manifest << R"({"iid":")" << iid << R"(","name":")" << source.stem().string()
                      << R"(","metadata":)" << metadata;
             if (!manifestData.empty()) {
                 manifest << "," << manifestData;
@@ -170,6 +170,22 @@ BOOST_AUTO_TEST_CASE(test_directory_layout) {
     checkPluginSystemLayout(stdc::pluginsystem::PluginSystem::Directory);
 }
 
+BOOST_AUTO_TEST_CASE(test_directory_layout_resolves_library_prefix) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    const auto original = directory.addPlugin(
+        "plugin", R"({"id":"Plugin","name":"Plugin","version":"1.0"})");
+    const auto prefixed = original.parent_path() / ("lib" + original.filename().string());
+    std::filesystem::rename(original, prefixed);
+
+    stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
+                                            stdc::pluginsystem::PluginSystem::Directory);
+    system.setPluginPaths(directory.path());
+
+    const auto specs = system.plugins();
+    BOOST_REQUIRE_EQUAL(specs.size(), 1u);
+    BOOST_CHECK_EQUAL(specs.front()->id(), "Plugin");
+}
+
 BOOST_AUTO_TEST_CASE(test_replacing_paths_discards_unloaded_specs) {
     TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Flat);
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem");
@@ -266,7 +282,7 @@ BOOST_AUTO_TEST_CASE(test_spec_exposes_complete_manifest) {
     const auto &manifest = spec->manifest();
     BOOST_CHECK_EQUAL(manifest["iid"].toString(), "org.stdcorelib.PluginSystem");
     BOOST_CHECK_EQUAL(manifest["applicationData"]["answer"].toInt(), 42);
-    BOOST_CHECK(!manifest["binary"].toString().empty());
+    BOOST_CHECK(!manifest["name"].toString().empty());
 }
 
 BOOST_AUTO_TEST_CASE(test_global_and_local_settings_precedence_and_freeze_at_load) {

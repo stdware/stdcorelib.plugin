@@ -190,7 +190,7 @@ Static and runtime plugins differ only in how their instances enter the factory:
 
 - The root `iid` field is still required and must match the IID passed to the `PluginSystem` constructor.
 - The root `metadata` field is required and follows the `PluginSystem` schema below.
-- The root `binary` field is reserved by the `Directory` layout and names the plugin library inside its directory.
+- The root `name` field is reserved by the `Directory` layout and gives the plugin library's platform-independent name. It is separate from the user-visible `metadata.name` field.
 - Other root fields remain user-defined and are not interpreted by `PluginSystem`.
 
 The `metadata` object has the following schema:
@@ -237,7 +237,7 @@ A plugin with compatibility version `C` and current version `V` satisfies a requ
 `PluginSystem` supports two filesystem layouts:
 
 - `Flat` is the default. It puts plugin libraries directly below each search path and reads their embedded manifests.
-- `Directory` gives every plugin a child directory containing its library and a sidecar `plugin.json`. The manifest must contain the reserved root `binary` field naming the library in that directory.
+- `Directory` gives every plugin a child directory containing its library and a sidecar `plugin.json`. The manifest must contain a root `name` without a platform library prefix or suffix. For example, `"name": "editor"` can resolve to `editor.dll`, `libeditor.dll`, `libeditor.so`, or `libeditor.dylib`.
 
 ### Plugin Implementation
 

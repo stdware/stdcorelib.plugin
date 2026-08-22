@@ -13,10 +13,10 @@
 
 namespace stdc::plugin {
 
-    class STDC_PLUGIN_EXPORT PluginFactory::Impl {
+    class PluginFactory::Impl {
     public:
         Impl();
-        virtual ~Impl();
+        ~Impl();
 
     public:
         /// Builds an empty loader this factory owns.

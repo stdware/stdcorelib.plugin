@@ -104,8 +104,6 @@ namespace stdc::plugin {
         class Impl;
         std::unique_ptr<Impl> _impl;
 
-        explicit PluginFactory(Impl &impl);
-
         STDC_DISABLE_COPY(PluginFactory)
     };
 
