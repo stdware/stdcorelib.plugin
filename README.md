@@ -266,35 +266,97 @@ STDC_EXPORT_PLUGIN(EditorPlugin)
 
 Configure every path and setting before `loadPlugins()`. Loading freezes the discovered plugin set, paths, and settings, so later changes have no effect.
 
+A typical application treats the two settings files differently:
+
+- The global file belongs to the application installation. An installer normally provides it. If it is absent or unreadable, the application may create and save its global defaults only when that location is writable. If writing there requires administrator or root privileges, the installer must provide the file.
+- The local file belongs to the current user. It normally does not exist on first startup, so an empty `PluginSettings` value is the local default.
+- After plugin shutdown, the application saves the local settings for the next run.
+
 ```cpp
 #include <filesystem>
+#include <fstream>
+#include <optional>
+#include <sstream>
+#include <utility>
 #include <vector>
 
 #include <stdcorelib/pluginsystem/pluginsettings.h>
 #include <stdcorelib/pluginsystem/pluginsystem.h>
+#include <stdcorelib/support/json.h>
 
 using namespace stdc::pluginsystem;
 
-PluginSystem plugins("org.example.ApplicationPlugin");
-const std::vector<std::filesystem::path> paths{"plugins"};
-plugins.setPluginPaths(paths);
-
-PluginSettings globalSettings;
-globalSettings.setPluginEnabled("org.example.experimental", true);
-plugins.setPluginSettings(PluginSystem::Global, globalSettings);
-
-PluginSettings localSettings;
-localSettings.setPluginEnabled("org.example.diagnostics", false);
-plugins.setPluginSettings(PluginSystem::Local, localSettings);
-
-plugins.loadPlugins();
-for (const auto spec : plugins.plugins()) {
-    if (spec->hasError()) {
-        // Report spec->id() and spec->errorMessage().
+std::optional<PluginSettings> readPluginSettings(const std::filesystem::path &path) {
+    std::ifstream file(path);
+    if (!file) {
+        return std::nullopt;
     }
+
+    std::stringstream text;
+    text << file.rdbuf();
+
+    stdc::json::ParseError parseError;
+    auto value = stdc::json::Value::fromJson(text.str(), true, &parseError);
+    if (parseError) {
+        return std::nullopt;
+    }
+    return PluginSettings::fromJson(value);
 }
 
-plugins.shutdownPlugins();
+bool writePluginSettings(const std::filesystem::path &path,
+                         const PluginSettings &settings) {
+    std::error_code error;
+    if (!path.parent_path().empty()) {
+        std::filesystem::create_directories(path.parent_path(), error);
+    }
+    if (error) {
+        return false;
+    }
+
+    std::ofstream file(path);
+    file << settings.toJson().toJson(4);
+    return bool(file);
+}
+
+int runApplication(const std::filesystem::path &applicationDir,
+                   const std::filesystem::path &userConfigDir) {
+    const auto globalSettingsPath = applicationDir / "plugin-settings.json";
+    const auto localSettingsPath = userConfigDir / "plugin-settings.json";
+
+    PluginSettings globalSettings;
+    if (auto stored = readPluginSettings(globalSettingsPath)) {
+        globalSettings = std::move(*stored);
+    } else {
+        globalSettings.setPluginEnabled("org.example.experimental", true);
+        if (!writePluginSettings(globalSettingsPath, globalSettings)) {
+            return 1;
+        }
+    }
+
+    PluginSettings localSettings;
+    if (auto stored = readPluginSettings(localSettingsPath)) {
+        localSettings = std::move(*stored);
+    }
+
+    PluginSystem plugins("org.example.ApplicationPlugin");
+    const std::vector<std::filesystem::path> paths{applicationDir / "plugins"};
+    plugins.setPluginPaths(paths);
+    plugins.setPluginSettings(PluginSystem::Global, globalSettings);
+    plugins.setPluginSettings(PluginSystem::Local, localSettings);
+
+    plugins.loadPlugins();
+    for (const auto spec : plugins.plugins()) {
+        if (spec->hasError()) {
+            // Report spec->id() and spec->errorMessage().
+        }
+    }
+
+    plugins.shutdownPlugins();
+    if (!writePluginSettings(localSettingsPath, plugins.pluginSettings(PluginSystem::Local))) {
+        return 1;
+    }
+    return 0;
+}
 ```
 
 The lifecycle has the following ordering and ownership rules:
