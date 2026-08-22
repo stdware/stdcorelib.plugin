@@ -8,12 +8,10 @@
 
 namespace stdc::pluginsystem {
 
-    void PluginSettings::setPluginEnabled(std::string id, bool enabled) {
-        _overrides[std::move(id)] = enabled;
-    }
-
-    void PluginSettings::resetPlugin(std::string_view id) {
-        if (auto it = _overrides.find(id); it != _overrides.end()) {
+    void PluginSettings::setPluginEnabled(std::string id, std::optional<bool> enabled) {
+        if (enabled) {
+            _overrides[std::move(id)] = *enabled;
+        } else if (auto it = _overrides.find(id); it != _overrides.end()) {
             _overrides.erase(it);
         }
     }
@@ -21,11 +19,6 @@ namespace stdc::pluginsystem {
     std::optional<bool> PluginSettings::pluginEnabled(std::string_view id) const {
         auto it = _overrides.find(id);
         return it == _overrides.end() ? std::optional<bool>() : it->second;
-    }
-
-    bool PluginSettings::isPluginEnabled(std::string_view id, bool enabledByDefault) const {
-        auto enabled = pluginEnabled(id);
-        return enabled.value_or(enabledByDefault);
     }
 
     std::vector<std::string> PluginSettings::enabledPlugins() const {

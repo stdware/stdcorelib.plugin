@@ -271,20 +271,20 @@ BOOST_AUTO_TEST_CASE(test_global_and_local_settings_precedence_and_freeze_at_loa
     globalSettings.setPluginEnabled("Plugin", true);
     stdc::pluginsystem::PluginSettings localSettings;
     localSettings.setPluginEnabled("Plugin", false);
-    system.setGlobalPluginSettings(globalSettings);
-    system.setLocalPluginSettings(localSettings);
+    system.setPluginSettings(stdc::pluginsystem::PluginSystem::Global, globalSettings);
+    system.setPluginSettings(stdc::pluginsystem::PluginSystem::Local, localSettings);
     BOOST_CHECK(spec->enabledByDefault());
     BOOST_CHECK(!spec->isEnabled());
 
-    localSettings.resetPlugin("Plugin");
-    system.setLocalPluginSettings(localSettings);
+    localSettings.setPluginEnabled("Plugin", std::nullopt);
+    system.setPluginSettings(stdc::pluginsystem::PluginSystem::Local, localSettings);
     BOOST_CHECK(spec->enabledByDefault());
     BOOST_CHECK(spec->isEnabled());
 
     globalSettings.setPluginEnabled("Plugin", false);
     localSettings.setPluginEnabled("Plugin", true);
-    system.setGlobalPluginSettings(globalSettings);
-    system.setLocalPluginSettings(localSettings);
+    system.setPluginSettings(stdc::pluginsystem::PluginSystem::Global, globalSettings);
+    system.setPluginSettings(stdc::pluginsystem::PluginSystem::Local, localSettings);
     BOOST_CHECK(!spec->enabledByDefault());
     BOOST_CHECK(spec->isEnabled());
 
@@ -293,14 +293,18 @@ BOOST_AUTO_TEST_CASE(test_global_and_local_settings_precedence_and_freeze_at_loa
 
     globalSettings.setPluginEnabled("Plugin", true);
     localSettings.setPluginEnabled("Plugin", false);
-    system.setGlobalPluginSettings(globalSettings);
-    system.setLocalPluginSettings(localSettings);
+    system.setPluginSettings(stdc::pluginsystem::PluginSystem::Global, globalSettings);
+    system.setPluginSettings(stdc::pluginsystem::PluginSystem::Local, localSettings);
     BOOST_CHECK(!spec->enabledByDefault());
     BOOST_CHECK(spec->isEnabled());
-    BOOST_REQUIRE(system.globalPluginSettings().pluginEnabled("Plugin"));
-    BOOST_CHECK(!*system.globalPluginSettings().pluginEnabled("Plugin"));
-    BOOST_REQUIRE(system.localPluginSettings().pluginEnabled("Plugin"));
-    BOOST_CHECK(*system.localPluginSettings().pluginEnabled("Plugin"));
+    const auto frozenGlobal =
+        system.pluginSettings(stdc::pluginsystem::PluginSystem::Global).pluginEnabled("Plugin");
+    const auto frozenLocal =
+        system.pluginSettings(stdc::pluginsystem::PluginSystem::Local).pluginEnabled("Plugin");
+    BOOST_REQUIRE(frozenGlobal);
+    BOOST_CHECK(!*frozenGlobal);
+    BOOST_REQUIRE(frozenLocal);
+    BOOST_CHECK(*frozenLocal);
 }
 
 BOOST_AUTO_TEST_CASE(test_disabled_dependencies) {
@@ -319,7 +323,7 @@ BOOST_AUTO_TEST_CASE(test_disabled_dependencies) {
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
                                             stdc::pluginsystem::PluginSystem::Directory);
     system.setPluginPaths(directory.path());
-    system.setLocalPluginSettings(settings);
+    system.setPluginSettings(stdc::pluginsystem::PluginSystem::Local, settings);
     system.loadPlugins();
 
     const auto specs = system.plugins();

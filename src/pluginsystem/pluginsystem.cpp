@@ -95,8 +95,9 @@ namespace stdc::pluginsystem {
     void PluginSystem::Impl::applySettings() const {
         for (auto &item : pluginData) {
             auto &data = item.second;
-            data.enabledByDefault = globalSettings.isPluginEnabled(data.id, data.enabledByMetadata);
-            data.enabled = localSettings.isPluginEnabled(data.id, data.enabledByDefault);
+            data.enabledByDefault =
+                globalSettings.pluginEnabled(data.id).value_or(data.enabledByMetadata);
+            data.enabled = localSettings.pluginEnabled(data.id).value_or(data.enabledByDefault);
         }
     }
 
@@ -362,36 +363,24 @@ namespace stdc::pluginsystem {
         return impl.factory->pluginPaths(impl.iid);
     }
 
-    void PluginSystem::setGlobalPluginSettings(PluginSettings settings) {
+    void PluginSystem::setPluginSettings(SettingsScope scope, PluginSettings settings) {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.configMtx);
         if (impl.loadStarted) {
             return;
         }
-        impl.globalSettings = std::move(settings);
-        impl.applySettings();
-    }
-
-    PluginSettings PluginSystem::globalPluginSettings() const {
-        stdc_impl_t;
-        std::shared_lock<std::shared_mutex> lock(impl.configMtx);
-        return impl.globalSettings;
-    }
-
-    void PluginSystem::setLocalPluginSettings(PluginSettings settings) {
-        stdc_impl_t;
-        std::unique_lock<std::shared_mutex> lock(impl.configMtx);
-        if (impl.loadStarted) {
-            return;
+        if (scope == Local) {
+            impl.localSettings = std::move(settings);
+        } else {
+            impl.globalSettings = std::move(settings);
         }
-        impl.localSettings = std::move(settings);
         impl.applySettings();
     }
 
-    PluginSettings PluginSystem::localPluginSettings() const {
+    PluginSettings PluginSystem::pluginSettings(SettingsScope scope) const {
         stdc_impl_t;
         std::shared_lock<std::shared_mutex> lock(impl.configMtx);
-        return impl.localSettings;
+        return scope == Local ? impl.localSettings : impl.globalSettings;
     }
 
     std::vector<PluginSpec *> PluginSystem::plugins() const {

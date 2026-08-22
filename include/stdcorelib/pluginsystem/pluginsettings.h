@@ -18,19 +18,16 @@ namespace stdc::pluginsystem {
     /// One source of plugin enabled-state overrides, keyed by stable plugin ID.
     class STDC_PLUGIN_EXPORT PluginSettings {
     public:
-        /// Records an explicit enabled state for \a id, replacing its previous override.
+        /// Replaces the enabled-state override for \a id.
         ///
         /// \pre \a id is not empty.
-        void setPluginEnabled(std::string id, bool enabled);
+        /// \param id The stable plugin identifier to update.
+        /// \param enabled The new override, or nothing to remove the existing override.
+        void setPluginEnabled(std::string id, std::optional<bool> enabled);
 
-        /// Removes the override for \a id so that plugin metadata decides its state again.
-        void resetPlugin(std::string_view id);
-
-        /// Returns the explicit override for \a id, or nothing when metadata decides its state.
+        /// Returns the explicit override for \a id, or nothing when a lower-priority source
+        /// decides its state.
         std::optional<bool> pluginEnabled(std::string_view id) const;
-
-        /// Applies the override for \a id to its metadata default.
-        bool isPluginEnabled(std::string_view id, bool enabledByDefault) const;
 
         std::vector<std::string> enabledPlugins() const;
         std::vector<std::string> disabledPlugins() const;

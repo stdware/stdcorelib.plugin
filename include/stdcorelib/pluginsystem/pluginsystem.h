@@ -28,6 +28,14 @@ namespace stdc::pluginsystem {
             Directory,
         };
 
+        /// Which plugin settings source to access.
+        enum SettingsScope {
+            /// System-wide settings that override plugin metadata defaults.
+            Global,
+            /// Per-user settings that override global settings.
+            Local,
+        };
+
         /// Creates a system that accepts only \a iid.
         ///
         /// \pre \a iid is not empty.
@@ -50,23 +58,14 @@ namespace stdc::pluginsystem {
         void setPluginPaths(array_view<std::filesystem::path> paths);
         std::vector<std::filesystem::path> pluginPaths() const;
 
-        /// Replaces system-wide enabled-state overrides before loadPlugins() starts.
+        /// Replaces enabled-state overrides in \a scope before loadPlugins() starts.
         ///
-        /// Global settings override plugin metadata. Calls after loadPlugins() starts have no
-        /// effect.
-        void setGlobalPluginSettings(PluginSettings settings);
+        /// Local settings override global settings, which override plugin metadata. Calls after
+        /// loadPlugins() starts have no effect.
+        void setPluginSettings(SettingsScope scope, PluginSettings settings);
 
-        /// Returns the global settings used as system-wide plugin defaults.
-        PluginSettings globalPluginSettings() const;
-
-        /// Replaces per-user enabled-state overrides before loadPlugins() starts.
-        ///
-        /// Local settings override global settings. Calls after loadPlugins() starts have no
-        /// effect.
-        void setLocalPluginSettings(PluginSettings settings);
-
-        /// Returns the local settings that override global settings for the current user.
-        PluginSettings localPluginSettings() const;
+        /// Returns the settings stored in \a scope.
+        PluginSettings pluginSettings(SettingsScope scope) const;
 
         /// Returns every discovered spec, preserving each pointer for this system's lifetime.
         std::vector<PluginSpec *> plugins() const;

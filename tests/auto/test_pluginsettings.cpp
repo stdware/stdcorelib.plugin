@@ -9,17 +9,17 @@ BOOST_AUTO_TEST_SUITE(test_pluginsettings)
 BOOST_AUTO_TEST_CASE(test_overrides) {
     stdc::pluginsystem::PluginSettings settings;
     BOOST_CHECK(!settings.pluginEnabled("Unknown"));
-    BOOST_CHECK(settings.isPluginEnabled("Unknown", true));
-    BOOST_CHECK(!settings.isPluginEnabled("Unknown", false));
+    BOOST_CHECK(settings.pluginEnabled("Unknown").value_or(true));
+    BOOST_CHECK(!settings.pluginEnabled("Unknown").value_or(false));
 
     settings.setPluginEnabled("Plugin", false);
     BOOST_REQUIRE(settings.pluginEnabled("Plugin"));
     BOOST_CHECK(!*settings.pluginEnabled("Plugin"));
-    BOOST_CHECK(!settings.isPluginEnabled("Plugin", true));
+    BOOST_CHECK(!settings.pluginEnabled("Plugin").value_or(true));
 
     settings.setPluginEnabled("Plugin", true);
     BOOST_CHECK(*settings.pluginEnabled("Plugin"));
-    settings.resetPlugin("Plugin");
+    settings.setPluginEnabled("Plugin", std::nullopt);
     BOOST_CHECK(!settings.pluginEnabled("Plugin"));
 }
 

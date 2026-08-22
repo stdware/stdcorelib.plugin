@@ -75,10 +75,10 @@ plugins.setPluginPaths(paths);
 
 stdc::pluginsystem::PluginSettings globalSettings;
 globalSettings.setPluginEnabled("org.example.experimental", true);
-plugins.setGlobalPluginSettings(globalSettings);
+plugins.setPluginSettings(stdc::pluginsystem::PluginSystem::Global, globalSettings);
 stdc::pluginsystem::PluginSettings localSettings;
 localSettings.setPluginEnabled("org.example.diagnostics", false);
-plugins.setLocalPluginSettings(localSettings);
+plugins.setPluginSettings(stdc::pluginsystem::PluginSystem::Local, localSettings);
 
 plugins.loadPlugins();
 for (const auto *spec : plugins.plugins()) {
