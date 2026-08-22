@@ -398,3 +398,7 @@ Disabled plugins affect dependency resolution as follows:
 - A disabled required dependency makes its dependent plugin invalid.
 - A disabled optional dependency is treated as absent.
 - A disabled plugin does not count as an error by itself.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
