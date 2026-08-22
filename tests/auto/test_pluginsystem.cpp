@@ -172,8 +172,8 @@ BOOST_AUTO_TEST_CASE(test_directory_layout) {
 
 BOOST_AUTO_TEST_CASE(test_directory_layout_resolves_library_prefix) {
     TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
-    const auto original = directory.addPlugin(
-        "plugin", R"({"id":"Plugin","name":"Plugin","version":"1.0"})");
+    const auto original =
+        directory.addPlugin("plugin", R"({"id":"Plugin","name":"Plugin","version":"1.0"})");
     const auto prefixed = original.parent_path() / ("lib" + original.filename().string());
     std::filesystem::rename(original, prefixed);
 
@@ -397,8 +397,8 @@ BOOST_AUTO_TEST_CASE(test_lifecycle_dependency_order_and_reentrant_queries) {
     activePluginSystem = nullptr;
 
     const std::vector<std::string> expected{
-        "provider.initialize",        "consumer.initialize",      "consumer.pluginInitialized",
-        "provider.pluginInitialized", "consumer.aboutToShutdown", "provider.aboutToShutdown",
+        "provider.initialize",         "consumer.initialize",      "consumer.pluginsInitialized",
+        "provider.pluginsInitialized", "consumer.aboutToShutdown", "provider.aboutToShutdown",
     };
     BOOST_CHECK_EQUAL_COLLECTIONS(lifecycleEvents.begin(), lifecycleEvents.end(), expected.begin(),
                                   expected.end());

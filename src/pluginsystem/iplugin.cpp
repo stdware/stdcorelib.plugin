@@ -6,7 +6,7 @@ namespace stdc::pluginsystem {
 
     IPlugin::~IPlugin() = default;
 
-    void IPlugin::pluginInitialized() {
+    void IPlugin::pluginsInitialized() {
     }
 
     void IPlugin::aboutToShutdown() {

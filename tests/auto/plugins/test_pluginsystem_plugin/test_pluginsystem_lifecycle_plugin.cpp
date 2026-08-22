@@ -19,8 +19,8 @@ namespace {
             return true;
         }
 
-        void pluginInitialized() override {
-            notify("pluginInitialized");
+        void pluginsInitialized() override {
+            notify("pluginsInitialized");
         }
 
         void aboutToShutdown() override {

@@ -36,7 +36,7 @@ namespace stdc::pluginsystem {
             Loaded,
             /// initialize() has succeeded.
             Initialized,
-            /// pluginInitialized() has been called.
+            /// pluginsInitialized() has been called.
             Running,
             /// The plugin has been shut down.
             Stopped,

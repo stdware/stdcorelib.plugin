@@ -57,8 +57,7 @@ namespace stdc::pluginsystem {
                     candidateName += std::string(suffix);
                     const auto candidate = parentPath / candidateName;
                     std::error_code ec;
-                    if (fs::is_regular_file(candidate, ec) &&
-                        SharedLibrary::isLibrary(candidate)) {
+                    if (fs::is_regular_file(candidate, ec) && SharedLibrary::isLibrary(candidate)) {
                         return candidate;
                     }
                 }
@@ -505,7 +504,7 @@ namespace stdc::pluginsystem {
             if (data->state != PluginSpec::Initialized || data->spec.hasError()) {
                 continue;
             }
-            data->plugin->pluginInitialized();
+            data->plugin->pluginsInitialized();
             data->state = PluginSpec::Running;
         }
     }
