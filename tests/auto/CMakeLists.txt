@@ -56,6 +56,9 @@ foreach(_name IN ITEMS provider consumer)
         TEST_PLUGINSYSTEM_LIFECYCLE_NAME="${_name}"
     )
     set_target_properties(${_target} PROPERTIES PREFIX "")
+    if(APPLE)
+        set_target_properties(${_target} PROPERTIES SUFFIX ".dylib")
+    endif()
 endforeach()
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
