@@ -21,7 +21,7 @@ namespace stdc::pluginsystem {
     public:
         /// The metadata and lifecycle state of this plugin.
         enum State {
-            /// PluginSystem metadata is invalid.
+            /// Metadata or dependencies are invalid.
             Invalid,
             /// PluginSystem metadata has been read.
             Read,
@@ -37,8 +37,13 @@ namespace stdc::pluginsystem {
             Stopped,
         };
 
+        /// The current metadata and lifecycle state.
         State state() const;
+
+        /// Whether this plugin has an error.
         bool hasError() const;
+
+        /// The current error message, or empty when \c hasError() is false.
         const std::string &errorMessage() const;
 
         /// The stable identifier used by dependencies and settings.
@@ -47,23 +52,27 @@ namespace stdc::pluginsystem {
         /// The display name, which does not have to be unique.
         const std::string &name() const;
 
+        /// The plugin version.
         const VersionNumber &version() const;
+
+        /// The oldest plugin version with which this version is compatible.
         const VersionNumber &compatVersion() const;
+
+        /// The dependencies declared by this plugin.
         const std::vector<PluginDependency> &dependencies() const;
 
         /// Whether metadata and global settings enable this plugin before local overrides.
         bool enabledByDefault() const;
 
-        /// Whether this plugin was enabled when loadPlugins() froze the plugin set.
+        /// The effective enabled state, frozen when loadPlugins() starts.
         bool isEnabled() const;
 
-        /// The plugin shared library path.
+        /// The dynamic plugin path.
         const std::filesystem::path &filePath() const;
 
         /// Returns the loaded plugin instance, or null before loading and after unloading.
         ///
-        /// The PluginLoader owns this instance. The pointer remains valid at least until
-        /// shutdownPlugins() unloads its library.
+        /// The pointer remains valid until shutdownPlugins() unloads its library.
         IPlugin *plugin() const;
 
     private:

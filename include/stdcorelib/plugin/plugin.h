@@ -13,11 +13,7 @@ namespace stdc::plugin {
     /// \addtogroup plugin
     /// @{
 
-    /// Base class for all plugins.
-    ///
-    /// An interface and nothing else. What a plugin is, and where it was found, belongs to the
-    /// \c PluginLoader that produced it, the same way a QObject knows nothing of the QPluginLoader
-    /// it came out of.
+    /// Base interface for plugin instances.
     class Plugin {
     public:
         virtual ~Plugin() = default;
@@ -28,11 +24,10 @@ namespace stdc::plugin {
         STDC_DISABLE_MOVE(Plugin);
     };
 
-    /// A plugin linked into the program rather than found on disk.
+    /// Describes a static plugin.
     ///
-    /// It carries the same metadata a plugin.json would, since nothing else about it differs.
-    /// The metadata comes through a function so that a \c StaticPlugin stays constant
-    /// initializable, which is what lets one register itself before main runs.
+    /// The functions provide its instance and metadata without creating the instance during
+    /// registration.
     class StaticPlugin {
     public:
         using PluginInstanceFunction = Plugin *(*) ();
@@ -66,7 +61,7 @@ namespace stdc {
 
 namespace stdc::plugin {
 
-    /// The process-wide registry of plugins linked into the program.
+    /// The process-wide registry of static plugins.
     using StaticPluginRegistry = StaticRegistry<StaticPlugin>;
 
 }
@@ -79,7 +74,7 @@ namespace stdc::plugin {
 extern template class STDC_PLUGIN_EXPORT stdc::StaticRegistry<stdc::plugin::StaticPlugin>;
 #endif
 
-/// The symbol a plugin library exports, as a string, for whoever has to resolve it.
+/// The entry-point symbol exported by a dynamic plugin.
 #define STDC_PLUGIN_INSTANCE_SYMBOL "stdc_plugin_instance"
 
 /// Places generated metadata in the section inspected by \c PluginLoader.
@@ -96,8 +91,7 @@ extern template class STDC_PLUGIN_EXPORT stdc::StaticRegistry<stdc::plugin::Stat
 #  define STDC_PLUGIN_METADATA_SECTION __attribute__((section(".stdc_metadata"), used))
 #endif
 
-/// Exports \a PLUGIN_NAME from a shared library. Its manifest may be embedded or supplied beside
-/// the library according to the factory's scanning policy.
+/// Exports \a PLUGIN_NAME as a dynamic plugin instance.
 #define STDC_EXPORT_PLUGIN(PLUGIN_NAME)                                                            \
     extern "C" STDC_DECL_EXPORT stdc::plugin::Plugin *stdc_plugin_instance() {                     \
         static PLUGIN_NAME _instance;                                                              \
@@ -106,9 +100,8 @@ extern template class STDC_PLUGIN_EXPORT stdc::StaticRegistry<stdc::plugin::Stat
 
 /// Registers \a PLUGIN_NAME for \a PLUGIN_IID at startup.
 ///
-/// \a PLUGIN_METADATA is an expression yielding the \c stdc::json::Value that a plugin.json
-/// would have held. It is evaluated the first time the metadata is asked for, not during
-/// registration.
+/// \a PLUGIN_METADATA yields the complete metadata manifest, including its \c iid. It is
+/// evaluated the first time the metadata is requested.
 #define STDC_EXPORT_STATIC_PLUGIN(PLUGIN_NAME, PLUGIN_IID, PLUGIN_METADATA)                        \
     namespace {                                                                                    \
         stdc::plugin::StaticPluginRegistry::AddFactory                                             \

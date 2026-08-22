@@ -21,20 +21,10 @@ namespace stdc::plugin {
 
     class Plugin;
 
-    /// Finds plugins and hands out what is known about them.
+    /// Discovers plugins and owns their loaders.
     ///
-    /// The factory knows three things about a plugin: which extension point it plugs into, where
-    /// it lives, and the metadata blob it carries. It does not know what that blob means, and it
-    /// must not learn, because the extension points are not its to enumerate. They are declared
-    /// by whoever is being extended, in libraries this one has never heard of, so any rule baked
-    /// in here would already be wrong for one of them.
-    ///
-    /// So the factory hands over the candidates and whoever owns the extension point chooses.
-    ///
-    /// Plugins reach it three ways:
-    ///  - filesystem plugins: shared libraries with embedded manifests in a search directory
-    ///  - static plugins    : linked into the program, handing over the same metadata directly
-    ///  - runtime plugins   : instances the program supplies, owned by the program
+    /// Filesystem plugins are discovered lazily by IID. Static plugins and instances supplied by
+    /// the program can be added explicitly.
     ///
     /// Changing the search paths only affects later scans. Loaders already discovered are kept,
     /// and a loaded plugin is not unloaded when the paths for its IID change. Programs should set
@@ -48,15 +38,16 @@ namespace stdc::plugin {
         PluginFactory &operator=(PluginFactory &&RHS) noexcept;
 
     public:
-        /// Takes the statically linked plugins registered under \a pluginSet into this factory.
+        /// Adds the static plugins registered for the IID in \a pluginSet.
         ///
         /// Which extension point each one plugs into comes out of its metadata, exactly as it
         /// would for a plugin on disk.
         void addStaticPlugins(std::string_view pluginSet);
 
-        /// Takes an instance the program already holds. Ownership stays with the program.
+        /// Adds an instance the program already owns.
         ///
-        /// \a metadata says what a plugin.json would have said, \c iid included.
+        /// \a metadata is the complete manifest, including its \c iid. Ownership of \a plugin
+        /// stays with the caller.
         void addRuntimePlugin(Plugin *plugin, const json::Value &metadata);
 
     public:

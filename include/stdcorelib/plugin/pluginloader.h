@@ -22,15 +22,10 @@ namespace stdc::plugin {
 
     class PluginFactory;
 
-    /// Reads, loads, and owns one plugin library.
+    /// Reads metadata and manages one plugin.
     ///
-    /// A candidate without a valid IID is silently ignored by the factory. Once its IID has been
-    /// read, later metadata or loading failures stay on its loader and answer \c hasError(), so
-    /// the reason can be reported instead of the plugin quietly not being there.
-    ///
-    /// Metadata is read from the library without executing its code. Nothing is loaded until
-    /// \c load() is called, so installed plugins can be described without pulling in the
-    /// libraries they depend on.
+    /// Filesystem metadata is read without executing plugin code. The library is not loaded until
+    /// \c load() is called.
     class STDC_PLUGIN_EXPORT PluginLoader {
     public:
         PluginLoader();
@@ -45,9 +40,9 @@ namespace stdc::plugin {
 
         /// Where the selected plugin instance comes from.
         enum Origin {
-            /// A shared library on the filesystem.
+            /// A dynamic plugin on the filesystem.
             FileSystem,
-            /// A plugin linked into the program.
+            /// A static plugin.
             Static,
             /// A live instance supplied by the program.
             Runtime,
@@ -57,13 +52,13 @@ namespace stdc::plugin {
         enum State {
             /// No plugin has been selected.
             Null,
-            /// The manifest could not be read. Only \c errorMessage() is meaningful.
+            /// The manifest could not be read or validated.
             Invalid,
-            /// The metadata has been read. Everything but \c plugin() is meaningful.
+            /// The metadata has been read, but no plugin instance is live.
             Read,
             /// The metadata was read, but the plugin could not be loaded.
             LoadFailed,
-            /// The library is loaded and \c plugin() is live.
+            /// The plugin instance is live.
             Loaded,
         };
 
@@ -96,30 +91,27 @@ namespace stdc::plugin {
         /// \note This has no meaning while \c state() is \c Null.
         Origin origin() const;
 
-        /// Whether the last operation failed.
+        /// Whether the loader currently holds an error.
         bool hasError() const;
 
-        /// Why the last operation failed, empty after a successful load or unload.
+        /// The current error message, or empty when \c hasError() is false.
         const std::string &errorMessage() const;
 
     public:
-        /// The extension point this plugin plugs into, such as \c org.foo.bar.
-        ///
-        /// \note This is the only part of the manifest the factory interprets. Whoever owns the
-        ///       extension point decides what the rest of it means.
+        /// The extension point this plugin implements, such as \c org.foo.bar.
         const std::string &iid() const;
 
-        /// The shared library, or empty for a static or runtime plugin.
+        /// The dynamic plugin path, or empty for a static or runtime plugin.
         const std::filesystem::path &filePath() const;
 
-        /// The complete metadata manifest, including \c iid and \c metadata.
+        /// The complete metadata manifest, including its \c iid.
         const json::Value &metadata() const;
 
     public:
-        /// Loads the library on first call, returning whether \c plugin() is now live.
+        /// Makes the selected plugin instance live.
         ///
-        /// \note Why it failed is on \c errorMessage(), which is where it has to be anyway for a
-        ///       plugin that is installed but unusable to be able to say so.
+        /// \return Whether \c plugin() is now non-null. On failure, \c errorMessage() contains the
+        ///         reason.
         bool load();
 
         /// Unloads a filesystem plugin, invalidating the pointer returned by \c plugin().
@@ -133,7 +125,7 @@ namespace stdc::plugin {
             return state() == Loaded;
         }
 
-        /// The loaded instance, or null while \c state() is below \c Loaded.
+        /// The loaded instance, or null unless \c state() is \c Loaded.
         Plugin *plugin() const;
 
     public:

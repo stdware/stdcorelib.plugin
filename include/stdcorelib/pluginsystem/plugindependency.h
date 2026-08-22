@@ -17,7 +17,9 @@ namespace stdc::pluginsystem {
     public:
         /// Whether failure to resolve this dependency disables the declaring plugin.
         enum Type {
+            /// The declaring plugin cannot run without this dependency.
             Required,
+            /// The declaring plugin can run without this dependency.
             Optional,
         };
 
@@ -35,6 +37,7 @@ namespace stdc::pluginsystem {
             return _version;
         }
 
+        /// Whether this dependency is required or optional.
         inline Type type() const {
             return _type;
         }

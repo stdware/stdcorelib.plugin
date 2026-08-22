@@ -20,10 +20,10 @@ namespace stdc::pluginsystem {
         /// \return Whether initialization succeeded.
         virtual bool initialize(std::string *errorMessage) = 0;
 
-        /// Notifies this plugin after every enabled plugin has finished initialization.
+        /// Notifies this plugin after the initialization pass completes.
         virtual void pluginInitialized();
 
-        /// Notifies this plugin immediately before the system begins shutting plugins down.
+        /// Notifies this plugin during shutdown before any plugin library is unloaded.
         virtual void aboutToShutdown();
     };
 

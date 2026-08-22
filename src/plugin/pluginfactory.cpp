@@ -2,7 +2,6 @@
 
 #include "pluginfactory.h"
 #include "pluginfactory_p.h"
-#include "pluginloader_p.h"
 
 #include <mutex>
 #include <utility>
@@ -10,6 +9,8 @@
 #include <stdcorelib/pimpl.h>
 #include <stdcorelib/stlextra/algorithms.h>
 #include <stdcorelib/support/sharedlibrary.h>
+
+#include "pluginloader_p.h"
 
 namespace fs = std::filesystem;
 

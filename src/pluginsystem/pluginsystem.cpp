@@ -15,7 +15,7 @@
 #include <stdcorelib/path.h>
 #include <stdcorelib/stlextra/algorithms.h>
 
-#include <stdcorelib/plugin/pluginfactory.h>
+#include "pluginfactory.h"
 
 namespace fs = std::filesystem;
 
@@ -174,7 +174,7 @@ namespace stdc::pluginsystem {
             Visited,
         };
         std::map<PluginSpecData *, VisitState> visitStates;
-        // Dependency chains are normally shallow; sixteen pointers keep recursive DFS off-heap.
+        // Dependency chains are normally shallow. Sixteen pointers keep recursive DFS off-heap.
         vlarray<PluginSpecData *, 16> stack;
         std::map<PluginSpecData *, std::string> cycleErrors;
         std::function<void(PluginSpecData *)> findCycles = [&](PluginSpecData *data) {

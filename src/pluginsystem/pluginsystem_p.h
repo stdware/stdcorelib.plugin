@@ -29,7 +29,7 @@ namespace stdc::pluginsystem {
         /// Four direct dependencies cover the common case without making every map node large.
         using ResolvedDependencies = vlarray<ResolvedDependency, 4>;
 
-        /// Most applications load fewer than 32 plugins; larger sets spill to dynamic storage.
+        /// Most applications load fewer than 32 plugins. Larger sets spill to dynamic storage.
         using PluginOrder = vlarray<PluginSpecData *, 32>;
 
         Impl(std::string pluginIID, PluginLayout pluginLayout);
@@ -41,7 +41,7 @@ namespace stdc::pluginsystem {
         PluginSettings globalSettings;
         PluginSettings localSettings;
         mutable linked_map<plugin::PluginLoader *, PluginSpecData> pluginData;
-        /// Protects the path configuration, discovery cache, and transition to loadStarted.
+        /// Protects configuration, the discovery cache, and the transition to loadStarted.
         mutable std::shared_mutex configMtx;
         /// Serializes the one startup and shutdown sequence without blocking reentrant queries.
         std::mutex lifecycleMtx;

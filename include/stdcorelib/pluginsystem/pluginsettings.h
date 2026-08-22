@@ -29,7 +29,10 @@ namespace stdc::pluginsystem {
         /// decides its state.
         std::optional<bool> pluginEnabled(std::string_view id) const;
 
+        /// Returns the explicitly enabled plugin IDs in sorted order.
         std::vector<std::string> enabledPlugins() const;
+
+        /// Returns the explicitly disabled plugin IDs in sorted order.
         std::vector<std::string> disabledPlugins() const;
 
         /// Serializes the overrides as sorted \c enabled and \c disabled ID arrays.
