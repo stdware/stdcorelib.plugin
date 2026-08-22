@@ -31,6 +31,8 @@ namespace stdc::pluginsystem {
         bool enabledByGlobalSettings = true;
         /// The global result after the local settings override.
         bool enabled = true;
+        /// The result of the host load predicate, frozen when loading starts.
+        bool selectedForLoad = true;
         IPlugin *plugin = nullptr;
     };
 

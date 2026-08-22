@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+#include <stdcorelib/plugin/pluginfactory.h>
 #include <stdcorelib/pluginsystem/plugindependency.h>
 #include <stdcorelib/pluginsystem/pluginsystem.h>
 #include <stdcorelib/support/sharedlibrary.h>
@@ -62,6 +63,20 @@ namespace {
             return pluginPath;
         }
 
+        std::filesystem::path
+            addCustomPlugin(const std::string &directoryName, std::string_view metadata,
+                            const std::filesystem::path &source = TEST_PLUGINSYSTEM_PLUGIN_PATH) {
+            const auto pluginDirectory = _path / "vendor" / directoryName;
+            const auto libraryDirectory = pluginDirectory / "bin";
+            std::filesystem::create_directories(libraryDirectory);
+            const auto pluginPath = libraryDirectory / source.filename();
+            std::filesystem::copy_file(source, pluginPath);
+
+            std::ofstream manifest(pluginDirectory / "extension.json");
+            manifest << R"({"iid":"org.stdcorelib.PluginSystem","metadata":)" << metadata << "}";
+            return pluginPath;
+        }
+
         const std::filesystem::path &path() const {
             return _path;
         }
@@ -69,6 +84,56 @@ namespace {
     private:
         std::filesystem::path _path;
     };
+
+    class CustomPluginFactory final : public stdc::plugin::PluginFactory {
+    protected:
+        bool scanPluginPaths(const std::filesystem::path &path,
+                             std::vector<std::filesystem::path> *pluginPaths) const override {
+            std::error_code ec;
+            std::filesystem::recursive_directory_iterator dir(path, ec);
+            if (ec) {
+                return false;
+            }
+
+            const std::filesystem::recursive_directory_iterator end;
+            while (dir != end) {
+                if (dir->is_regular_file(ec) && !ec && dir->path().filename() == "extension.json") {
+                    pluginPaths->push_back(dir->path().parent_path());
+                }
+                ec.clear();
+                dir.increment(ec);
+                if (ec) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        bool resolvePluginPath(const std::filesystem::path &path, std::filesystem::path *pluginPath,
+                               std::optional<std::filesystem::path> *manifestPath) const override {
+            std::error_code ec;
+            std::filesystem::directory_iterator dir(path / "bin", ec);
+            if (ec) {
+                return false;
+            }
+
+            const std::filesystem::directory_iterator end;
+            while (dir != end) {
+                if (stdc::SharedLibrary::isLibrary(dir->path())) {
+                    *pluginPath = dir->path();
+                    *manifestPath = path / "extension.json";
+                    return true;
+                }
+                dir.increment(ec);
+                if (ec) {
+                    return false;
+                }
+            }
+            return false;
+        }
+    };
+
+    class RuntimePlugin final : public stdc::plugin::Plugin {};
 
     stdc::pluginsystem::PluginSpec *
         findPlugin(const std::vector<stdc::pluginsystem::PluginSpec *> &specs,
@@ -168,6 +233,32 @@ BOOST_AUTO_TEST_CASE(test_flat_layout) {
 
 BOOST_AUTO_TEST_CASE(test_directory_layout) {
     checkPluginSystemLayout(stdc::pluginsystem::PluginSystem::Directory);
+}
+
+BOOST_AUTO_TEST_CASE(test_custom_layout_factory) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::CustomLayout, false);
+    directory.addCustomPlugin("plugin", R"({"id":"Custom","name":"Custom","version":"1.0"})");
+
+    RuntimePlugin runtimePlugin;
+    auto factory = std::make_unique<CustomPluginFactory>();
+    factory->addRuntimePlugin(
+        &runtimePlugin,
+        stdc::json::Object{
+            {"iid",      "org.stdcorelib.PluginSystem"                                     },
+            {"metadata",
+             stdc::json::Object{{"id", "Runtime"}, {"name", "Runtime"}, {"version", "1.0"}}},
+    });
+
+    stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem", std::move(factory));
+    BOOST_CHECK_EQUAL(system.pluginLayout(), stdc::pluginsystem::PluginSystem::CustomLayout);
+    system.setPluginPaths(directory.path());
+
+    const auto specs = system.plugins();
+    BOOST_REQUIRE_EQUAL(specs.size(), 1u);
+    BOOST_CHECK_EQUAL(specs.front()->id(), "Custom");
+
+    system.loadPlugins();
+    BOOST_CHECK_EQUAL(specs.front()->state(), stdc::pluginsystem::PluginSpec::Running);
 }
 
 BOOST_AUTO_TEST_CASE(test_directory_layout_resolves_library_prefix) {
@@ -370,6 +461,54 @@ BOOST_AUTO_TEST_CASE(test_disabled_dependencies) {
     BOOST_CHECK_EQUAL(required->state(), stdc::pluginsystem::PluginSpec::Invalid);
     BOOST_CHECK(required->errorMessage().find("disabled") != std::string::npos);
     BOOST_CHECK_EQUAL(optional->state(), stdc::pluginsystem::PluginSpec::Running);
+}
+
+BOOST_AUTO_TEST_CASE(test_load_predicate_selection_and_dependencies) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    directory.addPlugin("provider", R"({"id":"Provider","name":"Provider","version":"1.0"})");
+    directory.addPlugin(
+        "required",
+        R"({"id":"Required","name":"Required","version":"1.0","dependencies":[{"id":"Provider","version":"1.0","type":"required"}]})");
+    directory.addPlugin(
+        "optional",
+        R"({"id":"Optional","name":"Optional","version":"1.0","dependencies":[{"id":"Provider","version":"1.0","type":"optional"}]})");
+
+    stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
+                                            stdc::pluginsystem::PluginSystem::Directory);
+    system.setPluginPaths(directory.path());
+    for (const auto spec : system.plugins()) {
+        BOOST_CHECK(spec->isSelectedForLoad());
+    }
+
+    int predicateCalls = 0;
+    system.setPluginLoadPredicate([&](const stdc::pluginsystem::PluginSpec &spec) {
+        ++predicateCalls;
+        system.plugins();
+        system.hasError();
+        return spec.id() != "Provider";
+    });
+    system.loadPlugins();
+
+    const auto specs = system.plugins();
+    auto provider = findPlugin(specs, "Provider");
+    auto required = findPlugin(specs, "Required");
+    auto optional = findPlugin(specs, "Optional");
+    BOOST_REQUIRE(provider);
+    BOOST_REQUIRE(required);
+    BOOST_REQUIRE(optional);
+    BOOST_CHECK_EQUAL(predicateCalls, 3);
+    BOOST_CHECK(provider->isEnabled());
+    BOOST_CHECK(!provider->isSelectedForLoad());
+    BOOST_CHECK_EQUAL(provider->state(), stdc::pluginsystem::PluginSpec::Read);
+    BOOST_CHECK(!provider->hasError());
+    BOOST_CHECK(required->isSelectedForLoad());
+    BOOST_CHECK_EQUAL(required->state(), stdc::pluginsystem::PluginSpec::Invalid);
+    BOOST_CHECK(required->errorMessage().find("selected") != std::string::npos);
+    BOOST_CHECK(optional->isSelectedForLoad());
+    BOOST_CHECK_EQUAL(optional->state(), stdc::pluginsystem::PluginSpec::Running);
+
+    system.setPluginLoadPredicate([](const auto &) { return true; });
+    BOOST_CHECK(!provider->isSelectedForLoad());
 }
 
 BOOST_AUTO_TEST_CASE(test_lifecycle_dependency_order_and_reentrant_queries) {

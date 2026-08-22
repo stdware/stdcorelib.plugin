@@ -75,6 +75,12 @@ namespace stdc::pluginsystem {
         /// The effective enabled state, frozen when loadPlugins() starts.
         bool isEnabled() const;
 
+        /// Whether the host predicate selected this plugin for loading.
+        ///
+        /// This is true before loadPlugins() evaluates the predicate. A plugin that is not selected
+        /// remains visible and is not itself considered erroneous.
+        bool isSelectedForLoad() const;
+
         /// The dynamic plugin path.
         const std::filesystem::path &filePath() const;
 

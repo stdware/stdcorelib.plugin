@@ -182,6 +182,7 @@ Static and runtime plugins differ only in how their instances enter the factory:
 - Discovers filesystem plugins only.
 - Resolves plugin dependencies.
 - Applies global and local enabled-state settings.
+- Applies a host load predicate for platform and product policy.
 - Controls plugin startup and shutdown.
 
 ### Plugin System Manifest
@@ -234,10 +235,11 @@ A plugin with compatibility version `C` and current version `V` satisfies a requ
 
 ### Plugin Layouts
 
-`PluginSystem` supports two filesystem layouts:
+`PluginSystem` supports three filesystem layouts:
 
 - `Flat` is the default. It puts plugin libraries directly below each search path and reads their embedded manifests.
 - `Directory` gives every plugin a child directory containing its library and a sidecar `plugin.json`. The manifest must contain a root `name` without a platform library prefix or suffix. For example, `"name": "editor"` can resolve to `editor.dll`, `libeditor.dll`, `libeditor.so`, or `libeditor.dylib`.
+- `CustomLayout` is reported when the constructor receives a user-provided `PluginFactory`. Its `scanPluginPaths()` and `resolvePluginPath()` overrides can implement recursive packages, another manifest name, or a separate library subdirectory. `PluginSystem` accepts only filesystem plugins returned by this factory.
 
 ### Plugin Implementation
 
@@ -264,7 +266,7 @@ STDC_EXPORT_PLUGIN(EditorPlugin)
 
 ### Host Startup And Shutdown
 
-Configure every path and setting before `loadPlugins()`. Loading freezes the discovered plugin set, paths, and settings, so later changes have no effect.
+Configure every path, setting, and load predicate before `loadPlugins()`. Loading freezes the discovered plugin set and all configuration, so later changes have no effect.
 
 A typical application treats the two settings files differently:
 
@@ -398,6 +400,20 @@ Disabled plugins affect dependency resolution as follows:
 - A disabled required dependency makes its dependent plugin invalid.
 - A disabled optional dependency is treated as absent.
 - A disabled plugin does not count as an error by itself.
+
+### Load Selection
+
+`setPluginLoadPredicate()` lets the host decide whether each valid spec applies to the current environment. The predicate runs once when loading starts and may inspect the complete manifest, including host-defined metadata such as an operating-system or application-edition constraint.
+
+```cpp
+plugins.setPluginLoadPredicate([&](const PluginSpec &spec) {
+    const auto &platform = spec.manifest()["metadata"]["platform"];
+    return platform.isNull() ||
+           (platform.isString() && platform.toString() == currentPlatform);
+});
+```
+
+A rejected plugin remains visible through `plugins()`, has `isSelectedForLoad() == false`, and is not erroneous by itself. A selected plugin with a rejected required dependency is invalid; a rejected optional dependency is treated as absent. Enabled-state settings and the predicate are independent, so a plugin loads only when both `isEnabled()` and `isSelectedForLoad()` are true.
 
 ## License
 

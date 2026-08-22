@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <fstream>
 #include <functional>
 #include <map>
@@ -126,11 +127,18 @@ namespace stdc::pluginsystem {
 
     PluginSystem::Impl::Impl(std::string pluginIID, PluginLayout pluginLayout)
         : iid(std::move(pluginIID)), layout(pluginLayout == Directory ? Directory : Flat) {
+        assert(pluginLayout != CustomLayout);
         if (layout == Directory) {
             factory = std::make_unique<DirectoryPluginFactory>();
         } else {
             factory = std::make_unique<plugin::PluginFactory>();
         }
+    }
+
+    PluginSystem::Impl::Impl(std::string pluginIID,
+                             std::unique_ptr<plugin::PluginFactory> pluginFactory)
+        : iid(std::move(pluginIID)), layout(CustomLayout), factory(std::move(pluginFactory)) {
+        assert(factory);
     }
 
     PluginSystem::Impl::~Impl() {
@@ -144,6 +152,24 @@ namespace stdc::pluginsystem {
                 globalSettings.pluginEnabled(data.id).value_or(data.enabledByManifest);
             data.enabled =
                 localSettings.pluginEnabled(data.id).value_or(data.enabledByGlobalSettings);
+        }
+    }
+
+    void PluginSystem::Impl::selectPlugins() {
+        // Most applications load fewer than 32 plugins. Keep predicate calls outside configMtx so
+        // they can make reentrant read-only queries, then commit the results under its write lock.
+        vlarray<std::pair<PluginSpecData *, bool>, 32> selections;
+        for (auto &item : pluginData) {
+            auto &data = item.second;
+            if (data.state != PluginSpec::Read) {
+                continue;
+            }
+            selections.emplace_back(&data, !loadPredicate || loadPredicate(data.spec));
+        }
+
+        std::unique_lock<std::shared_mutex> lock(configMtx);
+        for (const auto &[data, selected] : selections) {
+            data->selectedForLoad = selected;
         }
     }
 
@@ -172,7 +198,7 @@ namespace stdc::pluginsystem {
 
         for (auto &item : pluginData) {
             auto &data = item.second;
-            if (data.state != PluginSpec::Read || !data.enabled) {
+            if (data.state != PluginSpec::Read || !data.enabled || !data.selectedForLoad) {
                 continue;
             }
 
@@ -193,6 +219,14 @@ namespace stdc::pluginsystem {
                     if (dependency.type() == PluginDependency::Required) {
                         data.reportError("required dependency \"" + dependency.id() +
                                          "\" is disabled");
+                        break;
+                    }
+                    continue;
+                }
+                if (!candidate->selectedForLoad) {
+                    if (dependency.type() == PluginDependency::Required) {
+                        data.reportError("required dependency \"" + dependency.id() +
+                                         "\" was not selected for loading");
                         break;
                     }
                     continue;
@@ -289,7 +323,7 @@ namespace stdc::pluginsystem {
 
         std::set<PluginSpecData *> added;
         std::function<void(PluginSpecData *)> append = [&](PluginSpecData *data) {
-            if (stdc::contains(added, data) || !data->enabled ||
+            if (stdc::contains(added, data) || !data->enabled || !data->selectedForLoad ||
                 data->state != PluginSpec::Resolved) {
                 return;
             }
@@ -329,6 +363,12 @@ namespace stdc::pluginsystem {
         std::vector<plugin::PluginLoader *> loaders;
         if (scan) {
             loaders = factory->plugins(iid);
+            loaders.erase(std::remove_if(loaders.begin(), loaders.end(),
+                                         [](const auto loader) {
+                                             return loader->origin() !=
+                                                    plugin::PluginLoader::FileSystem;
+                                         }),
+                          loaders.end());
             for (auto it = pluginData.begin(); it != pluginData.end();) {
                 if (std::find(loaders.begin(), loaders.end(), it->first) == loaders.end()) {
                     it = pluginData.erase(it);
@@ -385,6 +425,10 @@ namespace stdc::pluginsystem {
         : _impl(std::make_unique<Impl>(std::string(iid), layout)) {
     }
 
+    PluginSystem::PluginSystem(std::string_view iid, std::unique_ptr<plugin::PluginFactory> factory)
+        : _impl(std::make_unique<Impl>(std::string(iid), std::move(factory))) {
+    }
+
     PluginSystem::~PluginSystem() = default;
 
     PluginSystem::PluginSystem(PluginSystem &&RHS) noexcept = default;
@@ -430,6 +474,15 @@ namespace stdc::pluginsystem {
         impl.applySettings();
     }
 
+    void PluginSystem::setPluginLoadPredicate(PluginLoadPredicate predicate) {
+        stdc_impl_t;
+        std::unique_lock<std::shared_mutex> lock(impl.configMtx);
+        if (impl.loadStarted) {
+            return;
+        }
+        impl.loadPredicate = std::move(predicate);
+    }
+
     PluginSettings PluginSystem::pluginSettings(SettingsScope scope) const {
         stdc_impl_t;
         std::shared_lock<std::shared_mutex> lock(impl.configMtx);
@@ -460,6 +513,7 @@ namespace stdc::pluginsystem {
             impl.loadStarted = true;
         }
 
+        impl.selectPlugins();
         impl.resolveDependencies();
 
         for (auto data : impl.loadOrder) {

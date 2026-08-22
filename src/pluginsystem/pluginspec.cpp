@@ -174,6 +174,10 @@ namespace stdc::pluginsystem {
         return _data->enabled;
     }
 
+    bool PluginSpec::isSelectedForLoad() const {
+        return _data->selectedForLoad;
+    }
+
     const std::filesystem::path &PluginSpec::filePath() const {
         return _data->loader->filePath();
     }

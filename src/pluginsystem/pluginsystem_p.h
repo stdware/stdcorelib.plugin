@@ -33,6 +33,7 @@ namespace stdc::pluginsystem {
         using PluginOrder = vlarray<PluginSpecData *, 32>;
 
         Impl(std::string pluginIID, PluginLayout pluginLayout);
+        Impl(std::string pluginIID, std::unique_ptr<plugin::PluginFactory> pluginFactory);
         ~Impl();
 
         std::string iid;
@@ -40,6 +41,7 @@ namespace stdc::pluginsystem {
         std::unique_ptr<plugin::PluginFactory> factory;
         PluginSettings globalSettings;
         PluginSettings localSettings;
+        PluginLoadPredicate loadPredicate;
         mutable linked_map<plugin::PluginLoader *, PluginSpecData> pluginData;
         /// Protects configuration, the discovery cache, and the transition to loadStarted.
         mutable std::shared_mutex configMtx;
@@ -53,6 +55,7 @@ namespace stdc::pluginsystem {
 
         void resolveDependencies();
         void applySettings() const;
+        void selectPlugins();
         bool requiredDependenciesAtState(PluginSpecData *data, PluginSpec::State state,
                                          std::string *errorMessage) const;
         void shutdownPlugins();
