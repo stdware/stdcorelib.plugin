@@ -169,14 +169,15 @@ jobs:
           ctest --test-dir build --output-on-failure --no-tests=error
 
   # The Windows implementation against the GNU Windows headers and linker. This is separate
-  # from clang-cl: both emit PE files, but expose different compatibility edges.
+  # from clang-cl: both emit PE files, but expose different compatibility edges. The
+  # no-exceptions shape covers the combination of those Windows paths and GCC's -fno-exceptions.
   mingw:
     name: windows-mingw ${{ matrix.config }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        config: [ shared, static ]
+        config: [ shared, static, no-exceptions ]
 
     steps:
       - uses: actions/checkout@v4
@@ -200,11 +201,16 @@ jobs:
       - name: Build and install stdcorelib
         shell: msys2 {0}
         run: |
+          flags=
+          if [[ "${{ matrix.config }}" == "no-exceptions" ]]; then
+            flags="-DSTDC_ENABLE_EXCEPTIONS=OFF"
+          fi
           cmake -G Ninja -S _deps/stdcorelib -B _deps/stdcorelib-build \
             -DCMAKE_BUILD_TYPE=Debug \
             -DSTDC_BUILD_SHARED=ON \
             -DSTDC_INSTALL=ON \
-            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/stdcorelib"
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/stdcorelib" \
+            $flags
           cmake --build _deps/stdcorelib-build
           cmake --install _deps/stdcorelib-build
 
@@ -214,6 +220,7 @@ jobs:
           case "${{ matrix.config }}" in
             shared) flags="-DSTDC_PLUGIN_BUILD_SHARED=ON" ;;
             static) flags="-DSTDC_PLUGIN_BUILD_STATIC=ON" ;;
+            no-exceptions) flags="-DSTDC_PLUGIN_BUILD_SHARED=ON -DSTDC_PLUGIN_ENABLE_EXCEPTIONS=OFF" ;;
           esac
           cmake -G Ninja -S . -B build \
             -DCMAKE_BUILD_TYPE=Debug \
