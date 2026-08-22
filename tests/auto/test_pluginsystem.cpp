@@ -45,7 +45,8 @@ namespace {
         std::filesystem::path
             addPlugin(const std::string &directoryName, std::string_view metadata,
                       const std::filesystem::path &source = TEST_PLUGINSYSTEM_PLUGIN_PATH,
-                      std::string_view iid = "org.stdcorelib.PluginSystem") {
+                      std::string_view iid = "org.stdcorelib.PluginSystem",
+                      std::string_view manifestData = {}) {
             const auto pluginDirectory = _path / directoryName;
             std::filesystem::create_directories(pluginDirectory);
             const auto pluginPath = pluginDirectory / source.filename();
@@ -53,7 +54,11 @@ namespace {
 
             std::ofstream manifest(pluginDirectory / "plugin.json");
             manifest << R"({"iid":")" << iid << R"(","binary":")" << source.filename().string()
-                     << R"(","metadata":)" << metadata << "}";
+                     << R"(","metadata":)" << metadata;
+            if (!manifestData.empty()) {
+                manifest << "," << manifestData;
+            }
+            manifest << "}";
             return pluginPath;
         }
 
@@ -165,6 +170,20 @@ BOOST_AUTO_TEST_CASE(test_directory_layout) {
     checkPluginSystemLayout(stdc::pluginsystem::PluginSystem::Directory);
 }
 
+BOOST_AUTO_TEST_CASE(test_replacing_paths_discards_unloaded_specs) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Flat);
+    stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem");
+    system.setPluginPaths(directory.path());
+    BOOST_REQUIRE_EQUAL(system.plugins().size(), 1u);
+
+    const std::vector<std::filesystem::path> noPaths;
+    system.setPluginPaths(noPaths);
+    BOOST_CHECK(system.plugins().empty());
+
+    system.setPluginPaths(directory.path());
+    BOOST_CHECK_EQUAL(system.plugins().size(), 1u);
+}
+
 BOOST_AUTO_TEST_CASE(test_concurrent_frozen_queries) {
     TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory);
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
@@ -196,28 +215,6 @@ BOOST_AUTO_TEST_CASE(test_concurrent_frozen_queries) {
     }
 
     BOOST_CHECK_EQUAL(system.plugins().front()->state(), stdc::pluginsystem::PluginSpec::Running);
-}
-
-BOOST_AUTO_TEST_CASE(test_spec_address_survives_discovery_growth) {
-    TemporaryPluginSystemDirectory firstDirectory(stdc::pluginsystem::PluginSystem::Directory,
-                                                  false);
-    firstDirectory.addPlugin("first", R"({"id":"First","name":"First","version":"1.0"})");
-    TemporaryPluginSystemDirectory secondDirectory(stdc::pluginsystem::PluginSystem::Directory,
-                                                   false);
-    secondDirectory.addPlugin("second", R"({"id":"Second","name":"Second","version":"1.0"})");
-
-    stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
-    std::vector<std::filesystem::path> paths{firstDirectory.path()};
-    system.setPluginPaths(paths);
-    auto firstSpec = findPlugin(system.plugins(), "First");
-    BOOST_REQUIRE(firstSpec);
-
-    paths.push_back(secondDirectory.path());
-    system.setPluginPaths(paths);
-    const auto specs = system.plugins();
-    BOOST_CHECK_EQUAL(findPlugin(specs, "First"), firstSpec);
-    BOOST_REQUIRE(findPlugin(specs, "Second"));
 }
 
 BOOST_AUTO_TEST_CASE(test_constructor_iid_selects_plugins) {
@@ -254,6 +251,24 @@ BOOST_AUTO_TEST_CASE(test_dependency_metadata) {
                       stdc::pluginsystem::PluginDependency::Optional);
 }
 
+BOOST_AUTO_TEST_CASE(test_spec_exposes_complete_manifest) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    directory.addPlugin("plugin", R"({"id":"Plugin","name":"Plugin","version":"1.0"})",
+                        TEST_PLUGINSYSTEM_PLUGIN_PATH, "org.stdcorelib.PluginSystem",
+                        R"("applicationData":{"answer":42})");
+
+    stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
+                                            stdc::pluginsystem::PluginSystem::Directory);
+    system.setPluginPaths(directory.path());
+    auto spec = findPlugin(system.plugins(), "Plugin");
+    BOOST_REQUIRE(spec);
+
+    const auto &manifest = spec->manifest();
+    BOOST_CHECK_EQUAL(manifest["iid"].toString(), "org.stdcorelib.PluginSystem");
+    BOOST_CHECK_EQUAL(manifest["applicationData"]["answer"].toInt(), 42);
+    BOOST_CHECK(!manifest["binary"].toString().empty());
+}
+
 BOOST_AUTO_TEST_CASE(test_global_and_local_settings_precedence_and_freeze_at_load) {
     TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
     directory.addPlugin(
@@ -264,7 +279,7 @@ BOOST_AUTO_TEST_CASE(test_global_and_local_settings_precedence_and_freeze_at_loa
     system.setPluginPaths(directory.path());
     auto spec = findPlugin(system.plugins(), "Plugin");
     BOOST_REQUIRE(spec);
-    BOOST_CHECK(!spec->enabledByDefault());
+    BOOST_CHECK(!spec->enabledByGlobalSettings());
     BOOST_CHECK(!spec->isEnabled());
 
     stdc::pluginsystem::PluginSettings globalSettings;
@@ -273,19 +288,19 @@ BOOST_AUTO_TEST_CASE(test_global_and_local_settings_precedence_and_freeze_at_loa
     localSettings.setPluginEnabled("Plugin", false);
     system.setPluginSettings(stdc::pluginsystem::PluginSystem::Global, globalSettings);
     system.setPluginSettings(stdc::pluginsystem::PluginSystem::Local, localSettings);
-    BOOST_CHECK(spec->enabledByDefault());
+    BOOST_CHECK(spec->enabledByGlobalSettings());
     BOOST_CHECK(!spec->isEnabled());
 
     localSettings.setPluginEnabled("Plugin", std::nullopt);
     system.setPluginSettings(stdc::pluginsystem::PluginSystem::Local, localSettings);
-    BOOST_CHECK(spec->enabledByDefault());
+    BOOST_CHECK(spec->enabledByGlobalSettings());
     BOOST_CHECK(spec->isEnabled());
 
     globalSettings.setPluginEnabled("Plugin", false);
     localSettings.setPluginEnabled("Plugin", true);
     system.setPluginSettings(stdc::pluginsystem::PluginSystem::Global, globalSettings);
     system.setPluginSettings(stdc::pluginsystem::PluginSystem::Local, localSettings);
-    BOOST_CHECK(!spec->enabledByDefault());
+    BOOST_CHECK(!spec->enabledByGlobalSettings());
     BOOST_CHECK(spec->isEnabled());
 
     system.loadPlugins();
@@ -295,7 +310,7 @@ BOOST_AUTO_TEST_CASE(test_global_and_local_settings_precedence_and_freeze_at_loa
     localSettings.setPluginEnabled("Plugin", false);
     system.setPluginSettings(stdc::pluginsystem::PluginSystem::Global, globalSettings);
     system.setPluginSettings(stdc::pluginsystem::PluginSystem::Local, localSettings);
-    BOOST_CHECK(!spec->enabledByDefault());
+    BOOST_CHECK(!spec->enabledByGlobalSettings());
     BOOST_CHECK(spec->isEnabled());
     const auto frozenGlobal =
         system.pluginSettings(stdc::pluginsystem::PluginSystem::Global).pluginEnabled("Plugin");

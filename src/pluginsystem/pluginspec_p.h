@@ -25,8 +25,11 @@ namespace stdc::pluginsystem {
         VersionNumber version;
         VersionNumber compatVersion;
         std::vector<PluginDependency> dependencies;
-        bool enabledByMetadata = true;
-        bool enabledByDefault = true;
+        /// The raw \c metadata.enabledByDefault manifest value.
+        bool enabledByManifest = true;
+        /// The manifest value after the global settings override.
+        bool enabledByGlobalSettings = true;
+        /// The global result after the local settings override.
         bool enabled = true;
         IPlugin *plugin = nullptr;
     };

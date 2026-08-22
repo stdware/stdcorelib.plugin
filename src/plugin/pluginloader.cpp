@@ -28,7 +28,7 @@ namespace stdc::plugin {
         clearError();
         iid.clear();
         filePath.clear();
-        metadata = json::Value();
+        manifest = json::Value();
         origin = PluginLoader::FileSystem;
         staticInstance = nullptr;
     }
@@ -46,7 +46,7 @@ namespace stdc::plugin {
     }
 
     bool PluginLoader::Impl::readLibrary(const std::filesystem::path &libraryPath,
-                                         const std::optional<std::filesystem::path> &metadataPath) {
+                                         const std::optional<std::filesystem::path> &manifestPath) {
         reset();
         filePath = fs::absolute(libraryPath);
         if (!fs::is_regular_file(filePath)) {
@@ -55,8 +55,8 @@ namespace stdc::plugin {
 
         std::string text;
         std::filesystem::path sourcePath = filePath;
-        if (metadataPath) {
-            sourcePath = fs::absolute(*metadataPath);
+        if (manifestPath) {
+            sourcePath = fs::absolute(*manifestPath);
             std::ifstream file(sourcePath);
             if (!file.is_open()) {
                 return reportError(formatN(R"(failed to open "%1")", sourcePath));
@@ -66,7 +66,7 @@ namespace stdc::plugin {
             text = ss.str();
         } else {
             std::string readError;
-            if (!readEmbeddedMetadata(filePath, &text, &readError)) {
+            if (!readEmbeddedManifest(filePath, &text, &readError)) {
                 return reportError(formatN(R"(%1: %2)", filePath, readError));
             }
         }
@@ -79,10 +79,10 @@ namespace stdc::plugin {
         if (parseError) {
             return reportError(formatN(R"(%1: %2)", sourcePath, parseError.message()));
         }
-        return readMetadata(root, sourcePath, filePath);
+        return readManifest(root, sourcePath, filePath);
     }
 
-    bool PluginLoader::Impl::readMetadata(const json::Value &root,
+    bool PluginLoader::Impl::readManifest(const json::Value &root,
                                           const std::filesystem::path &sourcePath,
                                           const std::filesystem::path &boundFilePath) {
         if (!root.isObject()) {
@@ -127,7 +127,7 @@ namespace stdc::plugin {
                 return reportError(formatN(R"(%1: "metadata" field is not an object)", sourcePath));
             }
         }
-        metadata = root;
+        manifest = root;
 
         state = PluginLoader::Read;
         return true;
@@ -137,9 +137,9 @@ namespace stdc::plugin {
         reset();
         origin = PluginLoader::Static;
         staticInstance = staticPlugin.instance;
-        metadata = staticPlugin.metadata ? staticPlugin.metadata() : json::Value();
+        manifest = staticPlugin.manifest ? staticPlugin.manifest() : json::Value();
 
-        auto staticIid = metadata["iid"];
+        auto staticIid = manifest["iid"];
         if (!staticIid.isString() || staticIid.toString().empty()) {
             return reportError("static plugin declares no iid");
         }
@@ -150,12 +150,12 @@ namespace stdc::plugin {
     }
 
     bool PluginLoader::Impl::setRuntimePlugin(Plugin *runtimePlugin,
-                                              const json::Value &runtimeMetadata) {
+                                              const json::Value &runtimeManifest) {
         reset();
         origin = PluginLoader::Runtime;
-        metadata = runtimeMetadata;
+        manifest = runtimeManifest;
 
-        auto runtimeIid = metadata["iid"];
+        auto runtimeIid = manifest["iid"];
         if (!runtimeIid.isString() || runtimeIid.toString().empty()) {
             return reportError("runtime plugin declares no iid");
         }
@@ -240,17 +240,17 @@ namespace stdc::plugin {
     }
 
     PluginLoader::PluginLoader(const std::filesystem::path &filePath,
-                               const std::optional<std::filesystem::path> &metadataPath)
+                               const std::optional<std::filesystem::path> &manifestPath)
         : PluginLoader() {
-        _impl->readLibrary(filePath, metadataPath);
+        _impl->readLibrary(filePath, manifestPath);
     }
 
     PluginLoader::PluginLoader(const StaticPlugin &plugin) : PluginLoader() {
         _impl->setStaticPlugin(plugin);
     }
 
-    PluginLoader::PluginLoader(Plugin *plugin, const json::Value &metadata) : PluginLoader() {
-        _impl->setRuntimePlugin(plugin, metadata);
+    PluginLoader::PluginLoader(Plugin *plugin, const json::Value &manifest) : PluginLoader() {
+        _impl->setRuntimePlugin(plugin, manifest);
     }
 
     PluginLoader::~PluginLoader() = default;
@@ -260,9 +260,9 @@ namespace stdc::plugin {
     PluginLoader &PluginLoader::operator=(PluginLoader &&RHS) noexcept = default;
 
     void PluginLoader::setFilePath(const std::filesystem::path &filePath,
-                                   const std::optional<std::filesystem::path> &metadataPath) {
+                                   const std::optional<std::filesystem::path> &manifestPath) {
         stdc_impl_t;
-        impl.readLibrary(filePath, metadataPath);
+        impl.readLibrary(filePath, manifestPath);
     }
 
     void PluginLoader::setStaticPlugin(const StaticPlugin &plugin) {
@@ -270,9 +270,9 @@ namespace stdc::plugin {
         impl.setStaticPlugin(plugin);
     }
 
-    void PluginLoader::setPlugin(Plugin *plugin, const json::Value &metadata) {
+    void PluginLoader::setPlugin(Plugin *plugin, const json::Value &manifest) {
         stdc_impl_t;
-        impl.setRuntimePlugin(plugin, metadata);
+        impl.setRuntimePlugin(plugin, manifest);
     }
 
     PluginLoader::State PluginLoader::state() const {
@@ -305,9 +305,9 @@ namespace stdc::plugin {
         return impl.filePath;
     }
 
-    const json::Value &PluginLoader::metadata() const {
+    const json::Value &PluginLoader::manifest() const {
         stdc_impl_t;
-        return impl.metadata;
+        return impl.manifest;
     }
 
     bool PluginLoader::load() {

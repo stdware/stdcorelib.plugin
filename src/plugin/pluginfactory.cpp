@@ -3,6 +3,7 @@
 #include "pluginfactory.h"
 #include "pluginfactory_p.h"
 
+#include <algorithm>
 #include <mutex>
 #include <utility>
 
@@ -27,6 +28,27 @@ namespace stdc::plugin {
         return std::make_unique<PluginLoader>();
     }
 
+    void PluginFactory::Impl::discardUnloadedFilePlugins(std::string_view iid) const {
+        auto found = loaders.find(iid);
+        if (found == loaders.end()) {
+            return;
+        }
+
+        auto &known = found->second;
+        auto newEnd = std::remove_if(
+            known.begin(), known.end(), [this](const std::unique_ptr<PluginLoader> &loader) {
+                if (loader->origin() != PluginLoader::FileSystem || loader->isLoaded()) {
+                    return false;
+                }
+                readPluginFiles.erase(loader->filePath().native());
+                return true;
+            });
+        known.erase(newEnd, known.end());
+        if (known.empty()) {
+            loaders.erase(found);
+        }
+    }
+
     void PluginFactory::Impl::scanPlugins(const PluginFactory &factory,
                                           std::string_view iid) const {
         auto it = pluginPaths.find(iid);
@@ -47,8 +69,8 @@ namespace stdc::plugin {
             }
             for (const auto &candidate : candidates) {
                 std::filesystem::path pluginPath;
-                std::optional<std::filesystem::path> metadataPath;
-                if (!factory.resolvePluginPath(candidate, &pluginPath, &metadataPath)) {
+                std::optional<std::filesystem::path> manifestPath;
+                if (!factory.resolvePluginPath(candidate, &pluginPath, &manifestPath)) {
                     scanSucceeded = false;
                     continue;
                 }
@@ -65,7 +87,7 @@ namespace stdc::plugin {
                 }
 
                 auto loader = createLoader();
-                loader->setFilePath(canonical, metadataPath);
+                loader->setFilePath(canonical, manifestPath);
                 if (loader->iid() != iid) {
                     continue;
                 }
@@ -106,10 +128,9 @@ namespace stdc::plugin {
         while (dir != end) {
             const auto candidate = dir->path();
             if (SharedLibrary::isLibrary(candidate)) {
-                std::string metadata;
+                std::string manifest;
                 std::string errorMessage;
-                if (PluginLoader::Impl::readEmbeddedMetadata(candidate, &metadata,
-                                                             &errorMessage)) {
+                if (PluginLoader::Impl::readEmbeddedManifest(candidate, &manifest, &errorMessage)) {
                     pluginPaths->push_back(candidate);
                 }
             }
@@ -125,9 +146,9 @@ namespace stdc::plugin {
     bool
         PluginFactory::resolvePluginPath(const std::filesystem::path &path,
                                          std::filesystem::path *pluginPath,
-                                         std::optional<std::filesystem::path> *metadataPath) const {
+                                         std::optional<std::filesystem::path> *manifestPath) const {
         *pluginPath = path;
-        metadataPath->reset();
+        manifestPath->reset();
         return true;
     }
 
@@ -144,11 +165,11 @@ namespace stdc::plugin {
         }
     }
 
-    void PluginFactory::addRuntimePlugin(Plugin *plugin, const json::Value &metadata) {
+    void PluginFactory::addRuntimePlugin(Plugin *plugin, const json::Value &manifest) {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
-        auto loader = std::make_unique<PluginLoader>(plugin, metadata);
+        auto loader = std::make_unique<PluginLoader>(plugin, manifest);
         if (loader->iid().empty()) {
             return;
         }
@@ -178,9 +199,21 @@ namespace stdc::plugin {
             }
             realPaths.push_back(fs::canonical(path));
         }
+
+        auto current = impl.pluginPaths.find(iid);
+        const bool unchanged =
+            realPaths.empty()
+                ? current == impl.pluginPaths.end()
+                : current != impl.pluginPaths.end() && current->second.size() == realPaths.size() &&
+                      std::equal(current->second.begin(), current->second.end(), realPaths.begin());
+        if (unchanged) {
+            return;
+        }
+
+        impl.discardUnloadedFilePlugins(iid);
         if (realPaths.empty()) {
-            if (auto it = impl.pluginPaths.find(iid); it != impl.pluginPaths.end()) {
-                impl.pluginPaths.erase(it);
+            if (current != impl.pluginPaths.end()) {
+                impl.pluginPaths.erase(current);
             }
         } else {
             impl.pluginPaths[std::string(iid)] = std::move(realPaths);

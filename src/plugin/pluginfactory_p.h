@@ -22,11 +22,11 @@ namespace stdc::plugin {
         /// Builds an empty loader this factory owns.
         static std::unique_ptr<PluginLoader> createLoader();
 
+        /// Discards filesystem loaders for \a iid that do not own a live plugin instance.
+        void discardUnloadedFilePlugins(std::string_view iid) const;
+
         /// Reads any manifest under the directories registered for \a iid that has not been read
         /// already.
-        ///
-        /// Scanning only ever adds. A loader that exists may have been handed out and may have been
-        /// loaded, so rescanning must not take it away.
         void scanPlugins(const PluginFactory &factory, std::string_view iid) const;
 
         std::map<std::string, vlarray<std::filesystem::path>, std::less<>> pluginPaths;

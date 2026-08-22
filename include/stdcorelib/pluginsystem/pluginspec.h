@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include <stdcorelib/support/json.h>
 #include <stdcorelib/support/versionnumber.h>
 
 #include <stdcorelib/pluginsystem/plugindependency.h>
@@ -14,6 +15,7 @@
 namespace stdc::pluginsystem {
 
     class IPlugin;
+
     class PluginSpecData;
 
     /// Describes one plugin discovered by a PluginSystem.
@@ -61,8 +63,11 @@ namespace stdc::pluginsystem {
         /// The dependencies declared by this plugin.
         const std::vector<PluginDependency> &dependencies() const;
 
-        /// Whether metadata and global settings enable this plugin before local overrides.
-        bool enabledByDefault() const;
+        /// The complete plugin manifest.
+        const json::Value &manifest() const;
+
+        /// Whether the manifest and global settings enable this plugin before local overrides.
+        bool enabledByGlobalSettings() const;
 
         /// The effective enabled state, frozen when loadPlugins() starts.
         bool isEnabled() const;

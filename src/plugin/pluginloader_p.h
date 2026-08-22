@@ -25,7 +25,7 @@ namespace stdc::plugin {
 
         std::string iid;
         std::filesystem::path filePath;
-        json::Value metadata;
+        json::Value manifest;
 
         /// Set for \c Static, which needs a way back to the instance it was registered with.
         StaticPlugin::PluginInstanceFunction staticInstance = nullptr;
@@ -35,14 +35,14 @@ namespace stdc::plugin {
 
     public:
         bool readLibrary(const std::filesystem::path &libraryPath,
-                         const std::optional<std::filesystem::path> &metadataPath = {});
-        bool readMetadata(const json::Value &root, const std::filesystem::path &sourcePath,
+                         const std::optional<std::filesystem::path> &manifestPath = {});
+        bool readManifest(const json::Value &root, const std::filesystem::path &sourcePath,
                           const std::filesystem::path &boundFilePath = {});
         bool setStaticPlugin(const StaticPlugin &plugin);
-        bool setRuntimePlugin(Plugin *plugin, const json::Value &metadata);
+        bool setRuntimePlugin(Plugin *plugin, const json::Value &manifest);
 
-        static bool readEmbeddedMetadata(const std::filesystem::path &filePath,
-                                         std::string *metadata, std::string *errorMessage);
+        static bool readEmbeddedManifest(const std::filesystem::path &filePath,
+                                         std::string *manifest, std::string *errorMessage);
 
         void reset();
         void clearError();

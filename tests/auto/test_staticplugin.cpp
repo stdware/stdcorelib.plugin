@@ -45,9 +45,9 @@ BOOST_AUTO_TEST_CASE(test_registry) {
     const auto plugins = stdc::plugin::PluginLoader::staticPlugins("test");
     BOOST_REQUIRE_EQUAL(plugins.size(), 1u);
     BOOST_REQUIRE(plugins.front().instance);
-    BOOST_REQUIRE(plugins.front().metadata);
+    BOOST_REQUIRE(plugins.front().manifest);
     BOOST_CHECK(plugins.front().instance() != nullptr);
-    BOOST_CHECK_EQUAL(plugins.front().metadata()["iid"].toString(), "org.stdcorelib.Test");
+    BOOST_CHECK_EQUAL(plugins.front().manifest()["iid"].toString(), "org.stdcorelib.Test");
 }
 
 BOOST_AUTO_TEST_CASE(test_loader_origin) {
@@ -58,7 +58,7 @@ BOOST_AUTO_TEST_CASE(test_loader_origin) {
     BOOST_CHECK_EQUAL(loader.origin(), stdc::plugin::PluginLoader::Static);
     BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Read);
     BOOST_CHECK(!loader.plugin());
-    BOOST_CHECK_EQUAL(loader.metadata()["iid"].toString(), "org.stdcorelib.Test");
+    BOOST_CHECK_EQUAL(loader.manifest()["iid"].toString(), "org.stdcorelib.Test");
 
     BOOST_REQUIRE_MESSAGE(loader.load(), loader.errorMessage());
     BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Loaded);

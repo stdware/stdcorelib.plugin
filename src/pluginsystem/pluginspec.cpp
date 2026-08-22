@@ -17,7 +17,7 @@ namespace stdc::pluginsystem {
             return reportError(loader->errorMessage());
         }
 
-        const auto &metadata = loader->metadata()["metadata"];
+        const auto &metadata = loader->manifest()["metadata"];
         if (!metadata.isObject()) {
             return reportError("missing or invalid metadata object");
         }
@@ -69,9 +69,9 @@ namespace stdc::pluginsystem {
             if (!enabledValue.isBool()) {
                 return reportError("invalid plugin enabledByDefault value");
             }
-            enabledByMetadata = enabledValue.toBool();
-            enabledByDefault = enabledByMetadata;
-            enabled = enabledByMetadata;
+            enabledByManifest = enabledValue.toBool();
+            enabledByGlobalSettings = enabledByManifest;
+            enabled = enabledByManifest;
         }
 
         const auto &dependencyValues = metadata["dependencies"];
@@ -162,8 +162,12 @@ namespace stdc::pluginsystem {
         return _data->dependencies;
     }
 
-    bool PluginSpec::enabledByDefault() const {
-        return _data->enabledByDefault;
+    const json::Value &PluginSpec::manifest() const {
+        return _data->loader->manifest();
+    }
+
+    bool PluginSpec::enabledByGlobalSettings() const {
+        return _data->enabledByGlobalSettings;
     }
 
     bool PluginSpec::isEnabled() const {

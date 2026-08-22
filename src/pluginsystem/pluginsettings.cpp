@@ -42,14 +42,15 @@ namespace stdc::pluginsystem {
     }
 
     json::Value PluginSettings::toJson() const {
-        json::Array enabled;
-        json::Array disabled;
+        json::Array enabledPlugins;
+        json::Array disabledPlugins;
         for (const auto &[id, isEnabled] : _overrides) {
-            (isEnabled ? enabled : disabled).emplace_back(id);
+            (isEnabled ? enabledPlugins : disabledPlugins).emplace_back(id);
         }
         return json::Object{
-            {"disabled", std::move(disabled)},
-            {"enabled",  std::move(enabled) },
+            {"disabledPlugins", std::move(disabledPlugins)},
+            {"enabledPlugins",  std::move(enabledPlugins) },
+            {"userData",        _userData                 },
         };
     }
 
@@ -69,6 +70,14 @@ namespace stdc::pluginsystem {
         }
 
         PluginSettings result;
+        const auto &object = value.toObject();
+        if (auto it = object.find("userData"); it != object.end()) {
+            if (!it->second.isObject()) {
+                return fail("plugin settings userData is not a JSON object");
+            }
+            result._userData = it->second.toObject();
+        }
+
         const auto readIds = [&](std::string_view field, bool enabled) {
             const auto &ids = value[field];
             if (ids.isNull()) {
@@ -90,11 +99,11 @@ namespace stdc::pluginsystem {
             return true;
         };
 
-        if (!readIds("enabled", true)) {
-            return fail("invalid or conflicting plugin ID in settings enabled array");
+        if (!readIds("enabledPlugins", true)) {
+            return fail("invalid or conflicting plugin ID in settings enabledPlugins array");
         }
-        if (!readIds("disabled", false)) {
-            return fail("invalid or conflicting plugin ID in settings disabled array");
+        if (!readIds("disabledPlugins", false)) {
+            return fail("invalid or conflicting plugin ID in settings disabledPlugins array");
         }
         return result;
     }

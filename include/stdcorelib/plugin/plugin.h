@@ -26,19 +26,19 @@ namespace stdc::plugin {
 
     /// Describes a static plugin.
     ///
-    /// The functions provide its instance and metadata without creating the instance during
+    /// The functions provide its instance and manifest without creating the instance during
     /// registration.
     class StaticPlugin {
     public:
         using PluginInstanceFunction = Plugin *(*) ();
-        using MetadataFunction = json::Value (*)();
+        using ManifestFunction = json::Value (*)();
 
-        constexpr StaticPlugin(PluginInstanceFunction i, MetadataFunction m)
-            : instance(i), metadata(m) {
+        constexpr StaticPlugin(PluginInstanceFunction i, ManifestFunction m)
+            : instance(i), manifest(m) {
         }
 
         PluginInstanceFunction instance = nullptr;
-        MetadataFunction metadata = nullptr;
+        ManifestFunction manifest = nullptr;
     };
 
     /// @}
@@ -77,9 +77,9 @@ extern template class STDC_PLUGIN_EXPORT stdc::StaticRegistry<stdc::plugin::Stat
 /// The entry-point symbol exported by a dynamic plugin.
 #define STDC_PLUGIN_INSTANCE_SYMBOL "stdc_plugin_instance"
 
-/// Places generated metadata in the section inspected by \c PluginLoader.
+/// Places a generated manifest in the section inspected by \c PluginLoader.
 ///
-/// Plugin projects should call \c stdc_add_plugin_metadata instead of using this macro directly.
+/// Plugin projects should call \c stdc_add_plugin_manifest instead of using this macro directly.
 #if defined(_WIN32) && defined(_MSC_VER) && !defined(__clang__)
 #  pragma section(".stdcmd", read, shared)
 #  define STDC_PLUGIN_METADATA_SECTION __declspec(allocate(".stdcmd"))
@@ -100,8 +100,8 @@ extern template class STDC_PLUGIN_EXPORT stdc::StaticRegistry<stdc::plugin::Stat
 
 /// Registers \a PLUGIN_NAME for \a PLUGIN_IID at startup.
 ///
-/// \a PLUGIN_METADATA yields the complete metadata manifest, including its \c iid. It is
-/// evaluated the first time the metadata is requested.
+/// \a PLUGIN_METADATA yields the complete manifest, including its \c iid. It is evaluated the
+/// first time the manifest is requested.
 #define STDC_EXPORT_STATIC_PLUGIN(PLUGIN_NAME, PLUGIN_IID, PLUGIN_METADATA)                        \
     namespace {                                                                                    \
         stdc::plugin::StaticPluginRegistry::AddFactory                                             \

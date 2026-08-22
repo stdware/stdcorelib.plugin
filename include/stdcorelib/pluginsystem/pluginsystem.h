@@ -54,7 +54,8 @@ namespace stdc::pluginsystem {
 
         /// Replaces the filesystem search paths before loadPlugins() starts.
         ///
-        /// Previously discovered specs remain. Calls after loadPlugins() starts have no effect.
+        /// This invalidates previously returned specs for unloaded plugins. Calls after
+        /// loadPlugins() starts have no effect.
         void setPluginPaths(array_view<std::filesystem::path> paths);
         std::vector<std::filesystem::path> pluginPaths() const;
 
@@ -67,10 +68,11 @@ namespace stdc::pluginsystem {
         /// Returns the settings stored in \a scope.
         PluginSettings pluginSettings(SettingsScope scope) const;
 
-        /// Returns every discovered spec, preserving each pointer for this system's lifetime.
+        /// Returns every discovered spec.
         ///
         /// Before loadPlugins() starts, this scans the current search paths. The discovered set is
-        /// frozen when loading starts.
+        /// frozen when loading starts. Replacing the paths before then invalidates pointers from
+        /// earlier calls.
         std::vector<PluginSpec *> plugins() const;
 
         /// Loads and initializes every enabled, valid plugin once.

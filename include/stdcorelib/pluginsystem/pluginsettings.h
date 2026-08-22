@@ -15,7 +15,7 @@
 
 namespace stdc::pluginsystem {
 
-    /// One source of plugin enabled-state overrides, keyed by stable plugin ID.
+    /// One source of plugin enabled-state overrides and application-defined data.
     class STDC_PLUGIN_EXPORT PluginSettings {
     public:
         /// Replaces the enabled-state override for \a id.
@@ -35,13 +35,20 @@ namespace stdc::pluginsystem {
         /// Returns the explicitly disabled plugin IDs in sorted order.
         std::vector<std::string> disabledPlugins() const;
 
-        /// Serializes the overrides as sorted \c enabled and \c disabled ID arrays.
+        /// Returns the application-defined settings data.
+        inline json::Object &userData();
+
+        /// Returns the application-defined settings data.
+        inline const json::Object &userData() const;
+
+        /// Serializes the data and sorted \c enabledPlugins and \c disabledPlugins ID arrays.
         json::Value toJson() const;
 
-        /// Reads overrides from \c enabled and \c disabled ID arrays.
+        /// Reads application data and overrides from \c userData, \c enabledPlugins, and
+        /// \c disabledPlugins.
         ///
-        /// Unknown plugin IDs are retained. Duplicate, empty, non-string, or conflicting IDs are
-        /// rejected.
+        /// The \c userData field may be omitted, but must be an object when present. Unknown
+        /// plugin IDs are retained. Duplicate, empty, non-string, or conflicting IDs are rejected.
         /// \param value The JSON object to read.
         /// \param errorMessage Receives why the value was rejected, or is cleared on success.
         static std::optional<PluginSettings> fromJson(const json::Value &value,
@@ -49,7 +56,16 @@ namespace stdc::pluginsystem {
 
     private:
         std::map<std::string, bool, std::less<>> _overrides;
+        json::Object _userData;
     };
+
+    inline json::Object &PluginSettings::userData() {
+        return _userData;
+    }
+
+    inline const json::Object &PluginSettings::userData() const {
+        return _userData;
+    }
 
 }
 

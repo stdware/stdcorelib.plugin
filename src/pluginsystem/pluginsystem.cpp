@@ -51,7 +51,7 @@ namespace stdc::pluginsystem {
             }
 
             bool resolvePluginPath(const fs::path &path, fs::path *pluginPath,
-                                   std::optional<fs::path> *metadataPath) const override {
+                                   std::optional<fs::path> *manifestPath) const override {
                 auto manifest = path / manifestName;
                 std::ifstream file(manifest);
                 if (!file.is_open()) {
@@ -72,7 +72,7 @@ namespace stdc::pluginsystem {
                 }
 
                 *pluginPath = path / stdc::path::from_utf8(binary.toString());
-                *metadataPath = std::move(manifest);
+                *manifestPath = std::move(manifest);
                 return true;
             }
         };
@@ -95,9 +95,10 @@ namespace stdc::pluginsystem {
     void PluginSystem::Impl::applySettings() const {
         for (auto &item : pluginData) {
             auto &data = item.second;
-            data.enabledByDefault =
-                globalSettings.pluginEnabled(data.id).value_or(data.enabledByMetadata);
-            data.enabled = localSettings.pluginEnabled(data.id).value_or(data.enabledByDefault);
+            data.enabledByGlobalSettings =
+                globalSettings.pluginEnabled(data.id).value_or(data.enabledByManifest);
+            data.enabled =
+                localSettings.pluginEnabled(data.id).value_or(data.enabledByGlobalSettings);
         }
     }
 
@@ -283,6 +284,13 @@ namespace stdc::pluginsystem {
         std::vector<plugin::PluginLoader *> loaders;
         if (scan) {
             loaders = factory->plugins(iid);
+            for (auto it = pluginData.begin(); it != pluginData.end();) {
+                if (std::find(loaders.begin(), loaders.end(), it->first) == loaders.end()) {
+                    it = pluginData.erase(it);
+                } else {
+                    ++it;
+                }
+            }
             for (auto loader : loaders) {
                 pluginData.try_emplace(loader, *loader);
             }

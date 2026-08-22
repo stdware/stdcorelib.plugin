@@ -14,7 +14,7 @@ namespace fs = std::filesystem;
 namespace stdc::plugin {
 
 #if 0
-    bool PluginLoader::Impl::readEmbeddedMetadata(const fs::path &filePath, std::string *metadata,
+    bool PluginLoader::Impl::readEmbeddedManifest(const fs::path &filePath, std::string *manifest,
                                                   std::string *errorMessage) {
         auto module =
             ::LoadLibraryExW(filePath.c_str(), nullptr,
@@ -26,7 +26,7 @@ namespace stdc::plugin {
 
         auto resource = ::FindResourceW(module, L"stdc_metadata", MAKEINTRESOURCEW(10));
         if (!resource) {
-            *errorMessage = "does not contain embedded plugin metadata";
+            *errorMessage = "does not contain an embedded plugin manifest";
             ::FreeLibrary(module);
             return false;
         }
@@ -34,12 +34,12 @@ namespace stdc::plugin {
         auto data = loaded ? ::LockResource(loaded) : nullptr;
         auto size = ::SizeofResource(module, resource);
         if (!data || !size) {
-            *errorMessage = "contains an unreadable plugin metadata resource";
+            *errorMessage = "contains an unreadable plugin manifest resource";
             ::FreeLibrary(module);
             return false;
         }
 
-        metadata->assign(static_cast<const char *>(data), size);
+        manifest->assign(static_cast<const char *>(data), size);
         ::FreeLibrary(module);
         return true;
     }
@@ -80,7 +80,7 @@ namespace stdc::plugin {
 
     }
 
-    bool PluginLoader::Impl::readEmbeddedMetadata(const fs::path &filePath, std::string *metadata,
+    bool PluginLoader::Impl::readEmbeddedManifest(const fs::path &filePath, std::string *manifest,
                                                   std::string *errorMessage) {
         auto rawFile = ::CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
                                      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -151,7 +151,7 @@ namespace stdc::plugin {
             constexpr auto disallowed = IMAGE_SCN_MEM_EXECUTE | IMAGE_SCN_MEM_WRITE;
             if (!(section.Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA) ||
                 section.Characteristics & disallowed) {
-                *errorMessage = "contains an invalid plugin metadata section";
+                *errorMessage = "contains an invalid plugin manifest section";
                 return false;
             }
 
@@ -161,16 +161,16 @@ namespace stdc::plugin {
             }
             if (size == 0 || !valid_range(section.PointerToRawData, size, fileSize) ||
                 size > std::numeric_limits<size_t>::max()) {
-                *errorMessage = "contains an invalid plugin metadata section";
+                *errorMessage = "contains an invalid plugin manifest section";
                 return false;
             }
 
-            metadata->assign(reinterpret_cast<const char *>(fileData + section.PointerToRawData),
+            manifest->assign(reinterpret_cast<const char *>(fileData + section.PointerToRawData),
                              static_cast<size_t>(size));
             return true;
         }
 
-        *errorMessage = "does not contain embedded plugin metadata";
+        *errorMessage = "does not contain an embedded plugin manifest";
         return false;
     }
 

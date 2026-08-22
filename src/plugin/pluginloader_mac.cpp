@@ -48,7 +48,7 @@ namespace stdc::plugin {
     }
 
     static bool read_macho_slice(std::ifstream &file, uint64_t base, uint64_t fileSize,
-                                 std::string *metadata) {
+                                 std::string *manifest) {
         uint32_t magic = 0;
         if (!read_object(file, base, fileSize, &magic)) {
             return false;
@@ -108,7 +108,7 @@ namespace stdc::plugin {
                             return false;
                         }
                         return read_bytes(file, base + sectionHeader.offset, sectionHeader.size,
-                                          fileSize, metadata);
+                                          fileSize, manifest);
                     }
                 }
             } else if (command.cmd == LC_SEGMENT_64) {
@@ -130,7 +130,7 @@ namespace stdc::plugin {
                             return false;
                         }
                         return read_bytes(file, base + sectionHeader.offset, sectionHeader.size,
-                                          fileSize, metadata);
+                                          fileSize, manifest);
                     }
                 }
             }
@@ -139,7 +139,7 @@ namespace stdc::plugin {
         return false;
     }
 
-    bool PluginLoader::Impl::readEmbeddedMetadata(const fs::path &filePath, std::string *metadata,
+    bool PluginLoader::Impl::readEmbeddedManifest(const fs::path &filePath, std::string *manifest,
                                                   std::string *errorMessage) {
         std::ifstream file(filePath, std::ios::binary);
         file.seekg(0, std::ios::end);
@@ -190,15 +190,15 @@ namespace stdc::plugin {
                 if (!valid_range(offset, size, fileSize)) {
                     continue;
                 }
-                if (read_macho_slice(file, offset, offset + size, metadata)) {
+                if (read_macho_slice(file, offset, offset + size, manifest)) {
                     return true;
                 }
                 file.clear();
             }
-        } else if (read_macho_slice(file, 0, fileSize, metadata)) {
+        } else if (read_macho_slice(file, 0, fileSize, manifest)) {
             return true;
         }
-        *errorMessage = "does not contain embedded plugin metadata";
+        *errorMessage = "does not contain an embedded plugin manifest";
         return false;
     }
 

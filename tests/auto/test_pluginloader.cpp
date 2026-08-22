@@ -19,8 +19,8 @@ namespace {
         }
 
         bool resolve(const std::filesystem::path &path, std::filesystem::path *pluginPath,
-                     std::optional<std::filesystem::path> *metadataPath) const {
-            return resolvePluginPath(path, pluginPath, metadataPath);
+                     std::optional<std::filesystem::path> *manifestPath) const {
+            return resolvePluginPath(path, pluginPath, manifestPath);
         }
     };
 
@@ -33,9 +33,9 @@ namespace {
         }
 
         bool resolvePluginPath(const std::filesystem::path &, std::filesystem::path *pluginPath,
-                               std::optional<std::filesystem::path> *metadataPath) const override {
+                               std::optional<std::filesystem::path> *manifestPath) const override {
             *pluginPath = TEST_PLUGINLOADER_PLUGIN_PATH;
-            *metadataPath = TEST_PLUGINLOADER_METADATA_PATH;
+            *manifestPath = TEST_PLUGINLOADER_MANIFEST_PATH;
             return true;
         }
     };
@@ -94,7 +94,7 @@ BOOST_AUTO_TEST_CASE(test_null) {
     BOOST_CHECK(!loader.hasError());
 }
 
-BOOST_AUTO_TEST_CASE(test_embedded_metadata_and_load) {
+BOOST_AUTO_TEST_CASE(test_embedded_manifest_and_load) {
     stdc::plugin::PluginLoader loader(TEST_PLUGINLOADER_PLUGIN_PATH);
 
     BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Read);
@@ -102,7 +102,7 @@ BOOST_AUTO_TEST_CASE(test_embedded_metadata_and_load) {
     BOOST_CHECK(!loader.hasError());
     BOOST_CHECK(!loader.plugin());
     BOOST_CHECK_EQUAL(loader.iid(), "org.stdcorelib.LoaderTest");
-    BOOST_CHECK_EQUAL(loader.metadata()["metadata"]["answer"].toInt(), 42);
+    BOOST_CHECK_EQUAL(loader.manifest()["metadata"]["answer"].toInt(), 42);
 
     BOOST_REQUIRE_MESSAGE(loader.load(), loader.errorMessage());
     BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Loaded);
@@ -119,7 +119,7 @@ BOOST_AUTO_TEST_CASE(test_embedded_metadata_and_load) {
 
 BOOST_AUTO_TEST_CASE(test_set_file_path) {
     stdc::plugin::PluginLoader loader;
-    loader.setFilePath(TEST_PLUGINLOADER_PLUGIN_PATH, TEST_PLUGINLOADER_METADATA_PATH);
+    loader.setFilePath(TEST_PLUGINLOADER_PLUGIN_PATH, TEST_PLUGINLOADER_MANIFEST_PATH);
 
     BOOST_CHECK_EQUAL(loader.filePath(), TEST_PLUGINLOADER_PLUGIN_PATH);
     BOOST_CHECK_EQUAL(loader.iid(), "org.stdcorelib.LoaderTest");
@@ -128,11 +128,11 @@ BOOST_AUTO_TEST_CASE(test_set_file_path) {
 
 BOOST_AUTO_TEST_CASE(test_runtime_plugin) {
     RuntimePlugin plugin;
-    const stdc::json::Value metadata = stdc::json::Object{
+    const stdc::json::Value manifest = stdc::json::Object{
         {"iid", "org.stdcorelib.RuntimeTest"},
     };
 
-    stdc::plugin::PluginLoader loader(&plugin, metadata);
+    stdc::plugin::PluginLoader loader(&plugin, manifest);
 
     BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Loaded);
     BOOST_CHECK_EQUAL(loader.origin(), stdc::plugin::PluginLoader::Runtime);
@@ -150,7 +150,7 @@ BOOST_AUTO_TEST_CASE(test_runtime_plugin) {
 
 BOOST_AUTO_TEST_CASE(test_load_failed) {
     stdc::plugin::PluginLoader loader;
-    loader.setFilePath(TEST_PLUGINLOADER_METADATA_PATH, TEST_PLUGINLOADER_METADATA_PATH);
+    loader.setFilePath(TEST_PLUGINLOADER_MANIFEST_PATH, TEST_PLUGINLOADER_MANIFEST_PATH);
 
     BOOST_REQUIRE_EQUAL(loader.state(), stdc::plugin::PluginLoader::Read);
     BOOST_CHECK(!loader.load());
@@ -161,7 +161,7 @@ BOOST_AUTO_TEST_CASE(test_load_failed) {
 }
 
 BOOST_AUTO_TEST_CASE(test_factory_scan_hooks) {
-    const auto root = std::filesystem::path(TEST_PLUGINLOADER_METADATA_PATH).parent_path();
+    const auto root = std::filesystem::path(TEST_PLUGINLOADER_MANIFEST_PATH).parent_path();
 
     TestPluginFactory factory;
     factory.addPluginPath("org.stdcorelib.LoaderTest", root);
@@ -178,12 +178,47 @@ BOOST_AUTO_TEST_CASE(test_factory_scan_hooks) {
 }
 
 BOOST_AUTO_TEST_CASE(test_factory_retries_failed_scan) {
-    const auto root = std::filesystem::path(TEST_PLUGINLOADER_METADATA_PATH).parent_path();
+    const auto root = std::filesystem::path(TEST_PLUGINLOADER_MANIFEST_PATH).parent_path();
 
     RetryPluginFactory factory;
     factory.addPluginPath("org.stdcorelib.LoaderTest", root);
     BOOST_CHECK(factory.plugins("org.stdcorelib.LoaderTest").empty());
     BOOST_CHECK_EQUAL(factory.plugins("org.stdcorelib.LoaderTest").size(), 1u);
+}
+
+BOOST_AUTO_TEST_CASE(test_factory_replaces_paths) {
+    const auto root = std::filesystem::path(TEST_PLUGINLOADER_MANIFEST_PATH).parent_path();
+    const std::vector<std::filesystem::path> paths{root};
+    const std::vector<std::filesystem::path> noPaths;
+
+    TestPluginFactory factory;
+    factory.setPluginPaths("org.stdcorelib.LoaderTest", paths);
+    const auto plugins = factory.plugins("org.stdcorelib.LoaderTest");
+    BOOST_REQUIRE_EQUAL(plugins.size(), 1u);
+
+    factory.setPluginPaths("org.stdcorelib.LoaderTest", paths);
+    BOOST_CHECK_EQUAL(factory.plugins("org.stdcorelib.LoaderTest").front(), plugins.front());
+
+    factory.setPluginPaths("org.stdcorelib.LoaderTest", noPaths);
+    BOOST_CHECK(factory.plugins("org.stdcorelib.LoaderTest").empty());
+}
+
+BOOST_AUTO_TEST_CASE(test_factory_keeps_loaded_plugin_when_replacing_paths) {
+    const auto root = std::filesystem::path(TEST_PLUGINLOADER_MANIFEST_PATH).parent_path();
+    const std::vector<std::filesystem::path> paths{root};
+    const std::vector<std::filesystem::path> noPaths;
+
+    TestPluginFactory factory;
+    factory.setPluginPaths("org.stdcorelib.LoaderTest", paths);
+    const auto plugins = factory.plugins("org.stdcorelib.LoaderTest");
+    BOOST_REQUIRE_EQUAL(plugins.size(), 1u);
+    BOOST_REQUIRE_MESSAGE(plugins.front()->load(), plugins.front()->errorMessage());
+
+    factory.setPluginPaths("org.stdcorelib.LoaderTest", noPaths);
+    const auto retained = factory.plugins("org.stdcorelib.LoaderTest");
+    BOOST_REQUIRE_EQUAL(retained.size(), 1u);
+    BOOST_CHECK_EQUAL(retained.front(), plugins.front());
+    BOOST_CHECK(retained.front()->isLoaded());
 }
 
 BOOST_AUTO_TEST_CASE(test_default_factory_scan) {
@@ -197,16 +232,16 @@ BOOST_AUTO_TEST_CASE(test_default_factory_scan) {
                       std::filesystem::path(TEST_PLUGINLOADER_PLUGIN_PATH).filename());
 
     std::filesystem::path pluginPath;
-    std::optional<std::filesystem::path> metadataPath = TEST_PLUGINLOADER_METADATA_PATH;
-    BOOST_REQUIRE(factory.resolve(candidates.front(), &pluginPath, &metadataPath));
+    std::optional<std::filesystem::path> manifestPath = TEST_PLUGINLOADER_MANIFEST_PATH;
+    BOOST_REQUIRE(factory.resolve(candidates.front(), &pluginPath, &manifestPath));
     BOOST_CHECK_EQUAL(pluginPath, candidates.front());
-    BOOST_CHECK(!metadataPath);
+    BOOST_CHECK(!manifestPath);
 
     factory.addPluginPath("org.stdcorelib.LoaderTest", directory.path());
 
     const auto plugins = factory.plugins("org.stdcorelib.LoaderTest");
     BOOST_REQUIRE_EQUAL(plugins.size(), 1u);
-    BOOST_CHECK_EQUAL(plugins.front()->metadata()["metadata"]["answer"].toInt(), 42);
+    BOOST_CHECK_EQUAL(plugins.front()->manifest()["metadata"]["answer"].toInt(), 42);
 }
 
 BOOST_AUTO_TEST_CASE(test_factory_ignores_runtime_plugin_without_iid) {

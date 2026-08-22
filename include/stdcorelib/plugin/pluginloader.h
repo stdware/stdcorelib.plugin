@@ -22,17 +22,17 @@ namespace stdc::plugin {
 
     class PluginFactory;
 
-    /// Reads metadata and manages one plugin.
+    /// Reads a manifest and manages one plugin.
     ///
-    /// Filesystem metadata is read without executing plugin code. The library is not loaded until
+    /// A filesystem manifest is read without executing plugin code. The library is not loaded until
     /// \c load() is called.
     class STDC_PLUGIN_EXPORT PluginLoader {
     public:
         PluginLoader();
         explicit PluginLoader(const std::filesystem::path &filePath,
-                              const std::optional<std::filesystem::path> &metadataPath = {});
+                              const std::optional<std::filesystem::path> &manifestPath = {});
         explicit PluginLoader(const StaticPlugin &plugin);
-        PluginLoader(Plugin *plugin, const json::Value &metadata);
+        PluginLoader(Plugin *plugin, const json::Value &manifest);
         ~PluginLoader();
 
         PluginLoader(PluginLoader &&RHS) noexcept;
@@ -48,41 +48,41 @@ namespace stdc::plugin {
             Runtime,
         };
 
-        /// The current metadata reading and plugin loading state.
+        /// The current manifest reading and plugin loading state.
         enum State {
             /// No plugin has been selected.
             Null,
             /// The manifest could not be read or validated.
             Invalid,
-            /// The metadata has been read, but no plugin instance is live.
+            /// The manifest has been read, but no plugin instance is live.
             Read,
-            /// The metadata was read, but the plugin could not be loaded.
+            /// The manifest was read, but the plugin could not be loaded.
             LoadFailed,
             /// The plugin instance is live.
             Loaded,
         };
 
     public:
-        /// Selects another plugin library and reads its metadata without loading its code.
+        /// Selects another plugin library and reads its manifest without loading its code.
         ///
         /// An already loaded library is unloaded first.
         ///
         /// \param filePath The plugin library to select.
-        /// \param metadataPath An external metadata JSON file, or empty to read metadata embedded
-        ///                     in the plugin library.
+        /// \param manifestPath An external manifest JSON file, or empty to read the manifest
+        ///                     embedded in the plugin library.
         void setFilePath(const std::filesystem::path &filePath,
-                         const std::optional<std::filesystem::path> &metadataPath = {});
+                         const std::optional<std::filesystem::path> &manifestPath = {});
 
         /// Selects a statically registered plugin without creating its instance.
         ///
-        /// \param plugin The registered plugin descriptor and metadata provider.
+        /// \param plugin The registered plugin descriptor and manifest provider.
         void setStaticPlugin(const StaticPlugin &plugin);
 
         /// Selects a plugin instance that the program already owns.
         ///
         /// \param plugin The live plugin instance. Ownership stays with the caller.
-        /// \param metadata The plugin metadata, including its \c iid.
-        void setPlugin(Plugin *plugin, const json::Value &metadata);
+        /// \param manifest The complete plugin manifest, including its \c iid.
+        void setPlugin(Plugin *plugin, const json::Value &manifest);
 
         State state() const;
 
@@ -104,8 +104,8 @@ namespace stdc::plugin {
         /// The dynamic plugin path, or empty for a static or runtime plugin.
         const std::filesystem::path &filePath() const;
 
-        /// The complete metadata manifest, including its \c iid.
-        const json::Value &metadata() const;
+        /// The complete manifest, including its \c iid.
+        const json::Value &manifest() const;
 
     public:
         /// Makes the selected plugin instance live.
