@@ -21,6 +21,11 @@ namespace stdc::plugin {
     class Plugin {
     public:
         virtual ~Plugin() = default;
+
+    protected:
+        Plugin() = default;
+
+        STDC_DISABLE_MOVE(Plugin);
     };
 
     /// A plugin linked into the program rather than found on disk.
@@ -99,20 +104,21 @@ extern template class STDC_PLUGIN_EXPORT stdc::StaticRegistry<stdc::plugin::Stat
         return &_instance;                                                                         \
     }
 
-/// Registers \a PLUGIN_NAME into \a PLUGIN_SET at startup.
+/// Registers \a PLUGIN_NAME for \a PLUGIN_IID at startup.
 ///
-/// \a METADATA is an expression yielding the \c stdc::json::Value that a plugin.json would have
-/// held. It is evaluated the first time the metadata is asked for, not during registration.
-#define STDC_EXPORT_STATIC_PLUGIN(PLUGIN_NAME, PLUGIN_SET, METADATA)                               \
+/// \a PLUGIN_METADATA is an expression yielding the \c stdc::json::Value that a plugin.json
+/// would have held. It is evaluated the first time the metadata is asked for, not during
+/// registration.
+#define STDC_EXPORT_STATIC_PLUGIN(PLUGIN_NAME, PLUGIN_IID, PLUGIN_METADATA)                        \
     namespace {                                                                                    \
         stdc::plugin::StaticPluginRegistry::AddFactory                                             \
-            PLUGIN_NAME##_initializer(PLUGIN_SET, "", []() -> stdc::plugin::StaticPlugin {         \
+            PLUGIN_NAME##_initializer(PLUGIN_IID, "", []() -> stdc::plugin::StaticPlugin {         \
                 return stdc::plugin::StaticPlugin(                                                 \
                     []() -> stdc::plugin::Plugin * {                                               \
                         static PLUGIN_NAME _instance;                                              \
                         return &_instance;                                                         \
                     },                                                                             \
-                    []() -> stdc::json::Value { return (METADATA); });                             \
+                    []() -> stdc::json::Value { return (PLUGIN_METADATA); });                      \
             });                                                                                    \
     }
 

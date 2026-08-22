@@ -137,7 +137,10 @@ namespace stdc::plugin {
         Plugin *plugin() const;
 
     public:
+        /// Returns the IIDs that have static plugins registered for them.
         static std::vector<std::string> staticPluginSets();
+
+        /// Returns the static plugins registered for \a iid.
         static std::vector<StaticPlugin> staticPlugins(std::string_view iid);
 
     protected:
