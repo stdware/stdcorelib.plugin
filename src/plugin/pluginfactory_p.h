@@ -16,7 +16,7 @@ namespace stdc::plugin {
     class PluginFactory::Impl {
     public:
         Impl();
-        ~Impl();
+        virtual ~Impl();
 
     public:
         /// Builds an empty loader this factory owns.
@@ -40,6 +40,15 @@ namespace stdc::plugin {
 
         mutable std::set<std::string, std::less<>> pluginsDirty;
         mutable std::shared_mutex plugins_mtx;
+    };
+
+    class BundlePluginFactory::Impl : public PluginFactory::Impl {
+    public:
+        explicit Impl(std::filesystem::path manifestFileName)
+            : manifestFileName(std::move(manifestFileName)) {
+        }
+
+        std::filesystem::path manifestFileName;
     };
 
 }

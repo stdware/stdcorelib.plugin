@@ -73,7 +73,9 @@ namespace {
             std::filesystem::copy_file(source, pluginPath);
 
             std::ofstream manifest(pluginDirectory / "extension.json");
-            manifest << R"({"iid":"org.stdcorelib.PluginSystem","metadata":)" << metadata << "}";
+            manifest << R"({"iid":"org.stdcorelib.PluginSystem","name":")" << source.stem().string()
+                     << R"(","file":")" << source.filename().string() << R"(","metadata":)"
+                     << metadata << "}";
             return pluginPath;
         }
 
@@ -85,7 +87,11 @@ namespace {
         std::filesystem::path _path;
     };
 
-    class CustomPluginFactory final : public stdc::plugin::PluginFactory {
+    class CustomPluginFactory final : public stdc::plugin::BundlePluginFactory {
+    public:
+        CustomPluginFactory() : BundlePluginFactory("extension.json") {
+        }
+
     protected:
         bool scanPluginPaths(const std::filesystem::path &path,
                              std::vector<std::filesystem::path> *pluginPaths) const override {
@@ -106,30 +112,38 @@ namespace {
                     return false;
                 }
             }
+            std::sort(pluginPaths->begin(), pluginPaths->end());
             return true;
         }
 
-        bool resolvePluginPath(const std::filesystem::path &path, std::filesystem::path *pluginPath,
-                               std::optional<std::filesystem::path> *manifestPath) const override {
-            std::error_code ec;
-            std::filesystem::directory_iterator dir(path / "bin", ec);
-            if (ec) {
-                return false;
+        std::optional<std::filesystem::path>
+            resolveLibraryPath(const std::filesystem::path &bundlePath,
+                               const stdc::json::Value &manifest) const override {
+            const auto &file = manifest["file"];
+            if (!file.isString()) {
+                return std::nullopt;
             }
+            const auto pluginPath = bundlePath / "bin" / file.toString();
+            if (!stdc::SharedLibrary::isLibrary(pluginPath)) {
+                return std::nullopt;
+            }
+            return pluginPath;
+        }
+    };
 
-            const std::filesystem::directory_iterator end;
-            while (dir != end) {
-                if (stdc::SharedLibrary::isLibrary(dir->path())) {
-                    *pluginPath = dir->path();
-                    *manifestPath = path / "extension.json";
-                    return true;
-                }
-                dir.increment(ec);
-                if (ec) {
-                    return false;
-                }
-            }
-            return false;
+    class ScanPluginFactory final : public stdc::plugin::PluginFactory {
+    public:
+        bool scan(const std::filesystem::path &path,
+                  std::vector<std::filesystem::path> *pluginPaths) const {
+            return scanPluginPaths(path, pluginPaths);
+        }
+    };
+
+    class ScanBundlePluginFactory final : public stdc::plugin::BundlePluginFactory {
+    public:
+        bool scan(const std::filesystem::path &path,
+                  std::vector<std::filesystem::path> *pluginPaths) const {
+            return scanPluginPaths(path, pluginPaths);
         }
     };
 
@@ -231,8 +245,22 @@ BOOST_AUTO_TEST_CASE(test_flat_layout) {
     checkPluginSystemLayout(stdc::pluginsystem::PluginSystem::Flat);
 }
 
-BOOST_AUTO_TEST_CASE(test_directory_layout) {
-    checkPluginSystemLayout(stdc::pluginsystem::PluginSystem::Directory);
+BOOST_AUTO_TEST_CASE(test_bundle_layout) {
+    checkPluginSystemLayout(stdc::pluginsystem::PluginSystem::Bundle);
+}
+
+BOOST_AUTO_TEST_CASE(test_default_factory_scans_sort_paths) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Flat, false);
+
+    std::vector<std::filesystem::path> pluginPaths{directory.path() / "z", directory.path() / "a"};
+    ScanPluginFactory flatFactory;
+    BOOST_REQUIRE(flatFactory.scan(directory.path(), &pluginPaths));
+    BOOST_CHECK(std::is_sorted(pluginPaths.begin(), pluginPaths.end()));
+
+    pluginPaths = {directory.path() / "z", directory.path() / "a"};
+    ScanBundlePluginFactory bundleFactory;
+    BOOST_REQUIRE(bundleFactory.scan(directory.path(), &pluginPaths));
+    BOOST_CHECK(std::is_sorted(pluginPaths.begin(), pluginPaths.end()));
 }
 
 BOOST_AUTO_TEST_CASE(test_custom_layout_factory) {
@@ -241,6 +269,7 @@ BOOST_AUTO_TEST_CASE(test_custom_layout_factory) {
 
     RuntimePlugin runtimePlugin;
     auto factory = std::make_unique<CustomPluginFactory>();
+    BOOST_CHECK_EQUAL(factory->manifestFileName(), std::filesystem::path("extension.json"));
     factory->addRuntimePlugin(
         &runtimePlugin,
         stdc::json::Object{
@@ -261,15 +290,15 @@ BOOST_AUTO_TEST_CASE(test_custom_layout_factory) {
     BOOST_CHECK_EQUAL(specs.front()->state(), stdc::pluginsystem::PluginSpec::Running);
 }
 
-BOOST_AUTO_TEST_CASE(test_directory_layout_resolves_library_prefix) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+BOOST_AUTO_TEST_CASE(test_bundle_layout_resolves_library_prefix) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     const auto original =
         directory.addPlugin("plugin", R"({"id":"Plugin","name":"Plugin","version":"1.0"})");
     const auto prefixed = original.parent_path() / ("lib" + original.filename().string());
     std::filesystem::rename(original, prefixed);
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
 
     const auto specs = system.plugins();
@@ -292,9 +321,9 @@ BOOST_AUTO_TEST_CASE(test_replacing_paths_discards_unloaded_specs) {
 }
 
 BOOST_AUTO_TEST_CASE(test_concurrent_frozen_queries) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle);
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     system.loadPlugins();
 
@@ -325,29 +354,29 @@ BOOST_AUTO_TEST_CASE(test_concurrent_frozen_queries) {
 }
 
 BOOST_AUTO_TEST_CASE(test_constructor_iid_selects_plugins) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin("plugin", R"({"id":"Custom","name":"Custom","version":"1.0"})",
                         TEST_PLUGINSYSTEM_PLUGIN_PATH, "org.example.CustomPluginSystem");
 
     stdc::pluginsystem::PluginSystem matching("org.example.CustomPluginSystem",
-                                              stdc::pluginsystem::PluginSystem::Directory);
+                                              stdc::pluginsystem::PluginSystem::Bundle);
     matching.setPluginPaths(directory.path());
     BOOST_REQUIRE_EQUAL(matching.plugins().size(), 1u);
 
     stdc::pluginsystem::PluginSystem mismatched("org.example.OtherPluginSystem",
-                                                stdc::pluginsystem::PluginSystem::Directory);
+                                                stdc::pluginsystem::PluginSystem::Bundle);
     mismatched.setPluginPaths(directory.path());
     BOOST_CHECK(mismatched.plugins().empty());
 }
 
 BOOST_AUTO_TEST_CASE(test_dependency_metadata) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin(
         "plugin",
         R"({"id":"Consumer","name":"Consumer","version":"1.0","dependencies":[{"id":"Provider","version":"2.0","type":"optional"}]})");
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     const auto specs = system.plugins();
     BOOST_REQUIRE_EQUAL(specs.size(), 1u);
@@ -359,13 +388,13 @@ BOOST_AUTO_TEST_CASE(test_dependency_metadata) {
 }
 
 BOOST_AUTO_TEST_CASE(test_spec_exposes_complete_manifest) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin("plugin", R"({"id":"Plugin","name":"Plugin","version":"1.0"})",
                         TEST_PLUGINSYSTEM_PLUGIN_PATH, "org.stdcorelib.PluginSystem",
                         R"("applicationData":{"answer":42})");
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     auto spec = findPlugin(system.plugins(), "Plugin");
     BOOST_REQUIRE(spec);
@@ -377,12 +406,12 @@ BOOST_AUTO_TEST_CASE(test_spec_exposes_complete_manifest) {
 }
 
 BOOST_AUTO_TEST_CASE(test_global_and_local_settings_precedence_and_freeze_at_load) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin(
         "plugin", R"({"id":"Plugin","name":"Plugin","version":"1.0","enabledByDefault":false})");
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     auto spec = findPlugin(system.plugins(), "Plugin");
     BOOST_REQUIRE(spec);
@@ -430,7 +459,7 @@ BOOST_AUTO_TEST_CASE(test_global_and_local_settings_precedence_and_freeze_at_loa
 }
 
 BOOST_AUTO_TEST_CASE(test_disabled_dependencies) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin("provider", R"({"id":"Provider","name":"Provider","version":"1.0"})");
     directory.addPlugin(
         "required",
@@ -443,7 +472,7 @@ BOOST_AUTO_TEST_CASE(test_disabled_dependencies) {
     settings.setPluginEnabled("Provider", false);
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     system.setPluginSettings(stdc::pluginsystem::PluginSystem::Local, settings);
     system.loadPlugins();
@@ -464,7 +493,7 @@ BOOST_AUTO_TEST_CASE(test_disabled_dependencies) {
 }
 
 BOOST_AUTO_TEST_CASE(test_load_predicate_selection_and_dependencies) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin("provider", R"({"id":"Provider","name":"Provider","version":"1.0"})");
     directory.addPlugin(
         "required",
@@ -474,7 +503,7 @@ BOOST_AUTO_TEST_CASE(test_load_predicate_selection_and_dependencies) {
         R"({"id":"Optional","name":"Optional","version":"1.0","dependencies":[{"id":"Provider","version":"1.0","type":"optional"}]})");
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     for (const auto spec : system.plugins()) {
         BOOST_CHECK(spec->isSelectedForLoad());
@@ -512,7 +541,7 @@ BOOST_AUTO_TEST_CASE(test_load_predicate_selection_and_dependencies) {
 }
 
 BOOST_AUTO_TEST_CASE(test_lifecycle_dependency_order_and_reentrant_queries) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     const auto providerPath =
         directory.addPlugin("provider", R"({"id":"Provider","name":"Provider","version":"1.0"})",
                             TEST_PLUGINSYSTEM_LIFECYCLE_PROVIDER_PATH);
@@ -527,7 +556,7 @@ BOOST_AUTO_TEST_CASE(test_lifecycle_dependency_order_and_reentrant_queries) {
     setLifecycleCallback(&consumerLibrary, consumerPath);
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     lifecycleEvents.clear();
     activePluginSystem = &system;
@@ -548,7 +577,7 @@ BOOST_AUTO_TEST_CASE(test_lifecycle_dependency_order_and_reentrant_queries) {
 }
 
 BOOST_AUTO_TEST_CASE(test_required_and_optional_dependencies) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin(
         "consumer",
         R"({"id":"Consumer","name":"Consumer","version":"1.0","dependencies":[{"id":"Provider","version":"1.5","type":"required"},{"id":"Absent","version":"1.0","type":"optional"}]})");
@@ -556,7 +585,7 @@ BOOST_AUTO_TEST_CASE(test_required_and_optional_dependencies) {
         "provider", R"({"id":"Provider","name":"Provider","version":"2.0","compatVersion":"1.0"})");
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     system.loadPlugins();
 
@@ -572,14 +601,14 @@ BOOST_AUTO_TEST_CASE(test_required_and_optional_dependencies) {
 }
 
 BOOST_AUTO_TEST_CASE(test_required_dependency_failure_is_isolated) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin(
         "broken",
         R"({"id":"Broken","name":"Broken","version":"1.0","dependencies":[{"id":"Absent","version":"1.0","type":"required"}]})");
     directory.addPlugin("working", R"({"id":"Working","name":"Working","version":"1.0"})");
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     system.loadPlugins();
 
@@ -595,7 +624,7 @@ BOOST_AUTO_TEST_CASE(test_required_dependency_failure_is_isolated) {
 }
 
 BOOST_AUTO_TEST_CASE(test_required_dependency_failure_propagates) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin(
         "top",
         R"({"id":"Top","name":"Top","version":"1.0","dependencies":[{"id":"Middle","version":"1.0","type":"required"}]})");
@@ -604,7 +633,7 @@ BOOST_AUTO_TEST_CASE(test_required_dependency_failure_propagates) {
         R"({"id":"Middle","name":"Middle","version":"1.0","dependencies":[{"id":"Absent","version":"1.0","type":"required"}]})");
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     system.loadPlugins();
 
@@ -617,7 +646,7 @@ BOOST_AUTO_TEST_CASE(test_required_dependency_failure_propagates) {
 }
 
 BOOST_AUTO_TEST_CASE(test_initialization_failure_is_isolated_and_propagates) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin("provider", R"({"id":"Provider","name":"Provider","version":"1.0"})",
                         TEST_PLUGINSYSTEM_FAILING_PLUGIN_PATH);
     directory.addPlugin(
@@ -626,7 +655,7 @@ BOOST_AUTO_TEST_CASE(test_initialization_failure_is_isolated_and_propagates) {
     directory.addPlugin("working", R"({"id":"Working","name":"Working","version":"1.0"})");
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     system.loadPlugins();
 
@@ -645,14 +674,14 @@ BOOST_AUTO_TEST_CASE(test_initialization_failure_is_isolated_and_propagates) {
 }
 
 BOOST_AUTO_TEST_CASE(test_incompatible_dependency) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin(
         "consumer",
         R"({"id":"Consumer","name":"Consumer","version":"1.0","dependencies":[{"id":"Provider","version":"3.0","type":"required"}]})");
     directory.addPlugin("provider", R"({"id":"Provider","name":"Provider","version":"2.0"})");
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     system.loadPlugins();
 
@@ -663,12 +692,12 @@ BOOST_AUTO_TEST_CASE(test_incompatible_dependency) {
 }
 
 BOOST_AUTO_TEST_CASE(test_duplicate_ids) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin("first", R"({"id":"Duplicate","name":"First","version":"1.0"})");
     directory.addPlugin("second", R"({"id":"Duplicate","name":"Second","version":"1.0"})");
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     system.loadPlugins();
 
@@ -681,12 +710,12 @@ BOOST_AUTO_TEST_CASE(test_duplicate_ids) {
 }
 
 BOOST_AUTO_TEST_CASE(test_duplicate_display_names_are_allowed) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin("first", R"({"id":"First","name":"Same Name","version":"1.0"})");
     directory.addPlugin("second", R"({"id":"Second","name":"Same Name","version":"1.0"})");
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     system.loadPlugins();
 
@@ -700,7 +729,7 @@ BOOST_AUTO_TEST_CASE(test_duplicate_display_names_are_allowed) {
 }
 
 BOOST_AUTO_TEST_CASE(test_circular_dependencies) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin(
         "a",
         R"({"id":"A","name":"A","version":"1.0","dependencies":[{"id":"B","version":"1.0","type":"required"}]})");
@@ -709,7 +738,7 @@ BOOST_AUTO_TEST_CASE(test_circular_dependencies) {
         R"({"id":"B","name":"B","version":"1.0","dependencies":[{"id":"A","version":"1.0","type":"required"}]})");
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     system.loadPlugins();
 
@@ -722,12 +751,12 @@ BOOST_AUTO_TEST_CASE(test_circular_dependencies) {
 }
 
 BOOST_AUTO_TEST_CASE(test_loaded_plugin_must_implement_iplugin) {
-    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Directory, false);
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin("plugin", R"({"id":"WrongType","name":"Wrong Type","version":"1.0"})",
                         TEST_PLUGINLOADER_PLUGIN_PATH);
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
-                                            stdc::pluginsystem::PluginSystem::Directory);
+                                            stdc::pluginsystem::PluginSystem::Bundle);
     system.setPluginPaths(directory.path());
     system.loadPlugins();
 

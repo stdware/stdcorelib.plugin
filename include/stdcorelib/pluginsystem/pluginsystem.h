@@ -34,8 +34,8 @@ namespace stdc::pluginsystem {
         enum PluginLayout {
             /// Plugin libraries are directly below the search path and carry embedded manifests.
             Flat,
-            /// Each child directory contains one plugin library and an external plugin.json.
-            Directory,
+            /// Each child directory is a bundle containing a plugin library and external manifest.
+            Bundle,
             /// Plugin discovery is provided by a custom PluginFactory.
             CustomLayout,
         };
@@ -54,7 +54,7 @@ namespace stdc::pluginsystem {
         /// Creates a system that accepts only \a iid.
         ///
         /// \pre \a iid is not empty.
-        /// \pre \a layout is \c Flat or \c Directory.
+        /// \pre \a layout is \c Flat or \c Bundle.
         explicit PluginSystem(std::string_view iid, PluginLayout layout = Flat);
 
         /// Creates a system that discovers plugins through \a factory.

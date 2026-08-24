@@ -4,9 +4,14 @@
 #include "pluginfactory_p.h"
 
 #include <algorithm>
+#include <array>
+#include <cassert>
+#include <fstream>
 #include <mutex>
+#include <sstream>
 #include <utility>
 
+#include <stdcorelib/path.h>
 #include <stdcorelib/pimpl.h>
 #include <stdcorelib/stlextra/algorithms.h>
 #include <stdcorelib/support/sharedlibrary.h>
@@ -18,6 +23,14 @@ namespace fs = std::filesystem;
 STDC_INSTANTIATE_STATIC_REGISTRY_EXPORT(stdc::plugin::StaticPlugin, STDC_PLUGIN_EXPORT)
 
 namespace stdc::plugin {
+
+    namespace {
+
+        bool is_file_name(const fs::path &path) {
+            return !path.empty() && path != "." && path != ".." && path == path.filename();
+        }
+
+    }
 
     PluginFactory::Impl::Impl() {
     }
@@ -104,7 +117,7 @@ namespace stdc::plugin {
         }
     }
 
-    PluginFactory::PluginFactory() : _impl(std::make_unique<Impl>()) {
+    PluginFactory::PluginFactory() : PluginFactory(std::make_unique<Impl>()) {
     }
 
     PluginFactory::~PluginFactory() = default;
@@ -137,6 +150,7 @@ namespace stdc::plugin {
                 return false;
             }
         }
+        std::sort(pluginPaths->begin(), pluginPaths->end());
         return true;
     }
 
@@ -247,6 +261,126 @@ namespace stdc::plugin {
             result.push_back(loader.get());
         }
         return result;
+    }
+
+    PluginFactory::PluginFactory(std::unique_ptr<Impl> impl) : _impl(std::move(impl)) {
+    }
+
+    BundlePluginFactory::BundlePluginFactory(fs::path manifestFileName)
+        : PluginFactory(std::make_unique<Impl>(std::move(manifestFileName))) {
+        stdc_impl_t;
+        assert(is_file_name(impl.manifestFileName));
+    }
+
+    BundlePluginFactory::~BundlePluginFactory() = default;
+
+    BundlePluginFactory::BundlePluginFactory(BundlePluginFactory &&RHS) noexcept = default;
+
+    BundlePluginFactory &
+        BundlePluginFactory::operator=(BundlePluginFactory &&RHS) noexcept = default;
+
+    const fs::path &BundlePluginFactory::manifestFileName() const {
+        stdc_impl_t;
+        return impl.manifestFileName;
+    }
+
+    bool BundlePluginFactory::scanPluginPaths(const fs::path &path,
+                                              std::vector<fs::path> *pluginPaths) const {
+        if (!is_file_name(manifestFileName())) {
+            return false;
+        }
+
+        std::error_code ec;
+        fs::directory_iterator dir(path, ec);
+        if (ec) {
+            return false;
+        }
+
+        const fs::directory_iterator end;
+        while (dir != end) {
+            if (dir->is_directory(ec) && !ec &&
+                fs::is_regular_file(dir->path() / manifestFileName(), ec) && !ec) {
+                pluginPaths->push_back(dir->path());
+            }
+            ec.clear();
+            dir.increment(ec);
+            if (ec) {
+                return false;
+            }
+        }
+        std::sort(pluginPaths->begin(), pluginPaths->end());
+        return true;
+    }
+
+    bool BundlePluginFactory::resolvePluginPath(const fs::path &path, fs::path *pluginPath,
+                                                std::optional<fs::path> *manifestPath) const {
+        if (!is_file_name(manifestFileName())) {
+            return false;
+        }
+
+        const auto manifest = path / manifestFileName();
+        std::ifstream file(manifest);
+        if (!file.is_open()) {
+            return false;
+        }
+
+        std::stringstream stream;
+        stream << file.rdbuf();
+        json::ParseError parseError;
+        auto root = json::Value::fromJson(stream.str(), true, &parseError);
+        if (parseError || !root.isObject()) {
+            return false;
+        }
+
+        auto resolvedPath = resolveLibraryPath(path, root);
+        if (!resolvedPath) {
+            return false;
+        }
+
+        *pluginPath = std::move(*resolvedPath);
+        *manifestPath = manifest;
+        return true;
+    }
+
+    std::optional<fs::path>
+        BundlePluginFactory::resolveLibraryPath(const fs::path &bundlePath,
+                                                const json::Value &manifest) const {
+        const auto &name = manifest["name"];
+        if (!name.isString() || name.toString().empty()) {
+            return std::nullopt;
+        }
+
+        const auto requestedPath = stdc::path::from_utf8(name.toString());
+        if (requestedPath.empty() || requestedPath.is_absolute() ||
+            requestedPath.has_parent_path()) {
+            return std::nullopt;
+        }
+
+        constexpr std::array<std::string_view, 2> prefixes{"", "lib"};
+        constexpr std::array<std::string_view, 2> suffixes{
+            "",
+#ifdef _WIN32
+            ".dll",
+#elif defined(__APPLE__)
+            ".dylib",
+#else
+            ".so",
+#endif
+        };
+
+        for (const auto prefix : prefixes) {
+            for (const auto suffix : suffixes) {
+                fs::path candidateName = std::string(prefix);
+                candidateName += requestedPath.native();
+                candidateName += std::string(suffix);
+                const auto candidate = bundlePath / candidateName;
+                std::error_code ec;
+                if (fs::is_regular_file(candidate, ec) && SharedLibrary::isLibrary(candidate)) {
+                    return candidate;
+                }
+            }
+        }
+        return std::nullopt;
     }
 
 }

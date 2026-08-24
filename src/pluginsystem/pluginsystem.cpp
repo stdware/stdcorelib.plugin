@@ -4,19 +4,14 @@
 #include "pluginsystem_p.h"
 
 #include <algorithm>
-#include <array>
 #include <cassert>
-#include <fstream>
 #include <functional>
 #include <map>
 #include <mutex>
 #include <set>
-#include <sstream>
 #include <utility>
 
-#include <stdcorelib/path.h>
 #include <stdcorelib/stlextra/algorithms.h>
-#include <stdcorelib/support/sharedlibrary.h>
 
 #include "pluginfactory.h"
 
@@ -24,112 +19,11 @@ namespace fs = std::filesystem;
 
 namespace stdc::pluginsystem {
 
-    namespace {
-
-        constexpr const char *manifestName = "plugin.json";
-
-        std::optional<fs::path> resolveLibraryName(const fs::path &directory,
-                                                   std::string_view name) {
-            const auto requestedPath = stdc::path::from_utf8(name);
-            if (requestedPath.empty() || requestedPath.is_absolute() ||
-                requestedPath.has_parent_path()) {
-                return std::nullopt;
-            }
-
-            const auto basePath = directory / requestedPath;
-            const auto parentPath = basePath.parent_path();
-            const auto baseName = basePath.filename();
-            constexpr std::array<std::string_view, 2> prefixes{"", "lib"};
-            constexpr std::array<std::string_view, 2> suffixes{
-                "",
-#ifdef _WIN32
-                ".dll",
-#elif defined(__APPLE__)
-                ".dylib",
-#else
-                ".so",
-#endif
-            };
-
-            for (const auto prefix : prefixes) {
-                for (const auto suffix : suffixes) {
-                    fs::path candidateName = std::string(prefix);
-                    candidateName += baseName.native();
-                    candidateName += std::string(suffix);
-                    const auto candidate = parentPath / candidateName;
-                    std::error_code ec;
-                    if (fs::is_regular_file(candidate, ec) && SharedLibrary::isLibrary(candidate)) {
-                        return candidate;
-                    }
-                }
-            }
-            return std::nullopt;
-        }
-
-        class DirectoryPluginFactory final : public plugin::PluginFactory {
-        protected:
-            bool scanPluginPaths(const fs::path &path,
-                                 std::vector<fs::path> *pluginPaths) const override {
-                std::error_code ec;
-                fs::directory_iterator dir(path, ec);
-                if (ec) {
-                    return false;
-                }
-
-                const fs::directory_iterator end;
-                while (dir != end) {
-                    if (dir->is_directory(ec) && !ec &&
-                        fs::is_regular_file(dir->path() / manifestName, ec) && !ec) {
-                        pluginPaths->push_back(dir->path());
-                    }
-                    ec.clear();
-                    dir.increment(ec);
-                    if (ec) {
-                        return false;
-                    }
-                }
-                return true;
-            }
-
-            bool resolvePluginPath(const fs::path &path, fs::path *pluginPath,
-                                   std::optional<fs::path> *manifestPath) const override {
-                auto manifest = path / manifestName;
-                std::ifstream file(manifest);
-                if (!file.is_open()) {
-                    return false;
-                }
-
-                std::stringstream stream;
-                stream << file.rdbuf();
-                json::ParseError parseError;
-                auto root = json::Value::fromJson(stream.str(), true, &parseError);
-                if (parseError || !root.isObject()) {
-                    return false;
-                }
-
-                const auto &name = root["name"];
-                if (!name.isString() || name.toString().empty()) {
-                    return false;
-                }
-
-                auto resolvedPath = resolveLibraryName(path, name.toString());
-                if (!resolvedPath) {
-                    return false;
-                }
-
-                *pluginPath = std::move(*resolvedPath);
-                *manifestPath = std::move(manifest);
-                return true;
-            }
-        };
-
-    }
-
     PluginSystem::Impl::Impl(std::string pluginIID, PluginLayout pluginLayout)
-        : iid(std::move(pluginIID)), layout(pluginLayout == Directory ? Directory : Flat) {
+        : iid(std::move(pluginIID)), layout(pluginLayout == Bundle ? Bundle : Flat) {
         assert(pluginLayout != CustomLayout);
-        if (layout == Directory) {
-            factory = std::make_unique<DirectoryPluginFactory>();
+        if (layout == Bundle) {
+            factory = std::make_unique<plugin::BundlePluginFactory>();
         } else {
             factory = std::make_unique<plugin::PluginFactory>();
         }

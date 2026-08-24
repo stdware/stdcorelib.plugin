@@ -104,7 +104,54 @@ namespace stdc::plugin {
         class Impl;
         std::unique_ptr<Impl> _impl;
 
+        explicit PluginFactory(std::unique_ptr<Impl> impl);
+
         STDC_DISABLE_COPY(PluginFactory)
+    };
+
+    /// Discovers plugin bundles stored one per child directory.
+    ///
+    /// Each bundle has an external manifest and a plugin library. The manifest's root \c name
+    /// field gives the library's platform-independent name. For example, \c editor can resolve to
+    /// \c editor.dll, \c libeditor.so, or \c libeditor.dylib.
+    class STDC_PLUGIN_EXPORT BundlePluginFactory : public PluginFactory {
+    public:
+        /// Creates a bundle factory with a configurable manifest file name.
+        ///
+        /// \param manifestFileName The manifest's file name inside each bundle.
+        ///
+        /// \pre \a manifestFileName is nonempty and contains no directory components.
+        explicit BundlePluginFactory(std::filesystem::path manifestFileName = "plugin.json");
+        ~BundlePluginFactory() override;
+
+        BundlePluginFactory(BundlePluginFactory &&RHS) noexcept;
+        BundlePluginFactory &operator=(BundlePluginFactory &&RHS) noexcept;
+
+        /// The manifest's file name inside each bundle.
+        const std::filesystem::path &manifestFileName() const;
+
+    protected:
+        bool scanPluginPaths(const std::filesystem::path &path,
+                             std::vector<std::filesystem::path> *pluginPaths) const override;
+        bool resolvePluginPath(const std::filesystem::path &path, std::filesystem::path *pluginPath,
+                               std::optional<std::filesystem::path> *manifestPath) const override;
+
+        /// Resolves the plugin library described by a bundle manifest.
+        ///
+        /// The default implementation reads the root \c name field, searches the bundle root, and
+        /// accepts the platform's library prefix and suffix around that name.
+        ///
+        /// \param bundlePath The bundle directory returned by scanPluginPaths().
+        /// \param manifest The complete root object read from the bundle manifest.
+        /// \return The library path, or nothing when no matching library exists.
+        virtual std::optional<std::filesystem::path>
+            resolveLibraryPath(const std::filesystem::path &bundlePath,
+                               const json::Value &manifest) const;
+
+    private:
+        class Impl;
+
+        STDC_DISABLE_COPY(BundlePluginFactory)
     };
 
     /// @}

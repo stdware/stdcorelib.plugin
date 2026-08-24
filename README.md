@@ -126,6 +126,7 @@ for (auto loader : factory.plugins("org.example.Renderer")) {
 
 Discovery has the following extension and lifetime rules:
 
+- `BundlePluginFactory` provides the common external-manifest layout: every immediate child directory is a bundle, its root `name` selects the platform library name, and its constructor can replace `plugin.json` with another manifest file name.
 - Subclasses can override `scanPluginPaths()` and `resolvePluginPath()` to implement another directory layout or external manifest policy.
 - Replacing search paths discards previously discovered filesystem loaders that are not loaded.
 - Loaded plugins are not unloaded when search paths change.
@@ -191,7 +192,7 @@ Static and runtime plugins differ only in how their instances enter the factory:
 
 - The root `iid` field is still required and must match the IID passed to the `PluginSystem` constructor.
 - The root `metadata` field is required and follows the `PluginSystem` schema below.
-- The root `name` field is reserved by the `Directory` layout and gives the plugin library's platform-independent name. It is separate from the user-visible `metadata.name` field.
+- The root `name` field is reserved by the `Bundle` layout and gives the plugin library's platform-independent name. It is separate from the user-visible `metadata.name` field.
 - Other root fields remain user-defined and are not interpreted by `PluginSystem`.
 
 The `metadata` object has the following schema:
@@ -238,7 +239,7 @@ A plugin with compatibility version `C` and current version `V` satisfies a requ
 `PluginSystem` supports three filesystem layouts:
 
 - `Flat` is the default. It puts plugin libraries directly below each search path and reads their embedded manifests.
-- `Directory` gives every plugin a child directory containing its library and a sidecar `plugin.json`. The manifest must contain a root `name` without a platform library prefix or suffix. For example, `"name": "editor"` can resolve to `editor.dll`, `libeditor.dll`, `libeditor.so`, or `libeditor.dylib`.
+- `Bundle` gives every plugin a child directory containing its library and a sidecar `plugin.json`. The manifest must contain a root `name` without a platform library prefix or suffix. For example, `"name": "editor"` can resolve to `editor.dll`, `libeditor.dll`, `libeditor.so`, or `libeditor.dylib`.
 - `CustomLayout` is reported when the constructor receives a user-provided `PluginFactory`. Its `scanPluginPaths()` and `resolvePluginPath()` overrides can implement recursive packages, another manifest name, or a separate library subdirectory. `PluginSystem` accepts only filesystem plugins returned by this factory.
 
 ### Plugin Implementation
