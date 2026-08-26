@@ -20,8 +20,6 @@ namespace stdc::plugin {
     /// \addtogroup plugin
     /// @{
 
-    class PluginFactory;
-
     /// Reads metadata and manages one plugin.
     ///
     /// Filesystem metadata is read without executing plugin code. The library is not loaded until
@@ -145,8 +143,6 @@ namespace stdc::plugin {
     protected:
         class Impl;
         std::unique_ptr<Impl> _impl;
-
-        friend class PluginFactory;
 
         STDC_DISABLE_COPY(PluginLoader)
     };

@@ -97,7 +97,7 @@ namespace {
         }
 
     protected:
-        bool scanPluginPaths(const std::filesystem::path &path,
+        bool scanPluginPaths(std::string_view, const std::filesystem::path &path,
                              std::vector<std::filesystem::path> *pluginPaths) const override {
             std::error_code ec;
             std::filesystem::recursive_directory_iterator dir(path, ec);
@@ -137,17 +137,17 @@ namespace {
 
     class ScanPluginFactory final : public stdc::plugin::PluginFactory {
     public:
-        bool scan(const std::filesystem::path &path,
+        bool scan(std::string_view iid, const std::filesystem::path &path,
                   std::vector<std::filesystem::path> *pluginPaths) const {
-            return scanPluginPaths(path, pluginPaths);
+            return scanPluginPaths(iid, path, pluginPaths);
         }
     };
 
     class ScanBundlePluginFactory final : public stdc::plugin::BundlePluginFactory {
     public:
-        bool scan(const std::filesystem::path &path,
+        bool scan(std::string_view iid, const std::filesystem::path &path,
                   std::vector<std::filesystem::path> *pluginPaths) const {
-            return scanPluginPaths(path, pluginPaths);
+            return scanPluginPaths(iid, path, pluginPaths);
         }
     };
 
@@ -258,12 +258,13 @@ BOOST_AUTO_TEST_CASE(test_default_factory_scans_sort_paths) {
 
     std::vector<std::filesystem::path> pluginPaths{directory.path() / "z", directory.path() / "a"};
     ScanPluginFactory flatFactory;
-    BOOST_REQUIRE(flatFactory.scan(directory.path(), &pluginPaths));
+    BOOST_REQUIRE(flatFactory.scan("org.stdcorelib.PluginSystem", directory.path(), &pluginPaths));
     BOOST_CHECK(std::is_sorted(pluginPaths.begin(), pluginPaths.end()));
 
     pluginPaths = {directory.path() / "z", directory.path() / "a"};
     ScanBundlePluginFactory bundleFactory;
-    BOOST_REQUIRE(bundleFactory.scan(directory.path(), &pluginPaths));
+    BOOST_REQUIRE(
+        bundleFactory.scan("org.stdcorelib.PluginSystem", directory.path(), &pluginPaths));
     BOOST_CHECK(std::is_sorted(pluginPaths.begin(), pluginPaths.end()));
 }
 
@@ -303,6 +304,25 @@ BOOST_AUTO_TEST_CASE(test_bundle_layout_resolves_library_prefix) {
 
     stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
                                             stdc::pluginsystem::PluginSystem::Bundle);
+    system.setPluginPaths(directory.path());
+
+    const auto specs = system.plugins();
+    BOOST_REQUIRE_EQUAL(specs.size(), 1u);
+    BOOST_CHECK_EQUAL(specs.front()->id(), "Plugin");
+}
+
+BOOST_AUTO_TEST_CASE(test_bundle_factory_accepts_relative_metadata_path) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
+    const auto pluginPath =
+        directory.addPlugin("plugin", R"({"id":"Plugin","displayName":"Plugin","version":"1.0"})");
+    const auto metadataDirectory = pluginPath.parent_path() / "metadata";
+    std::filesystem::create_directory(metadataDirectory);
+    std::filesystem::rename(pluginPath.parent_path() / "plugin.json",
+                            metadataDirectory / "plugin.json");
+
+    auto factory = std::make_unique<stdc::plugin::BundlePluginFactory>("metadata/plugin.json");
+    BOOST_CHECK_EQUAL(factory->metadataFileName(), std::filesystem::path("metadata/plugin.json"));
+    stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem", std::move(factory));
     system.setPluginPaths(directory.path());
 
     const auto specs = system.plugins();

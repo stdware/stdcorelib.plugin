@@ -141,7 +141,7 @@ for (auto loader : factory.plugins("org.example.Renderer")) {
 
 Discovery has the following extension and lifetime rules:
 
-- `BundlePluginFactory` provides the common external-metadata layout: every immediate child directory is a bundle, its root `name` selects the platform library name, and its constructor can replace `plugin.json` with another metadata file name.
+- `BundlePluginFactory` provides the common external-metadata layout: every immediate child directory is a bundle, its root `name` selects the platform library name, and its constructor can replace `plugin.json` with another relative metadata path such as `metadata/plugin.json`.
 - Subclasses can override `scanPluginPaths()` and `resolvePluginPath()` to implement another directory layout or external metadata policy.
 - Replacing search paths discards previously discovered filesystem loaders that are not loaded.
 - Loaded plugins are not unloaded when search paths change.
@@ -243,7 +243,7 @@ A plugin with compatibility version `C` and current version `V` satisfies a requ
 
 - `Flat` is the default. It puts plugin libraries directly below each search path and reads their embedded metadata.
 - `Bundle` gives every plugin a child directory containing its library and a sidecar `plugin.json`. The metadata must contain a root `name` without a platform library prefix or suffix. For example, `"name": "editor"` can resolve to `editor.dll`, `libeditor.dll`, `libeditor.so`, or `libeditor.dylib`.
-- `CustomLayout` is reported when the constructor receives a user-provided `PluginFactory`. Its `scanPluginPaths()` and `resolvePluginPath()` overrides can implement recursive packages, another metadata file name, or a separate library subdirectory. `PluginSystem` accepts only filesystem plugins returned by this factory.
+- `CustomLayout` is reported when the constructor receives a user-provided `PluginFactory`. Its `scanPluginPaths()` and `resolvePluginPath()` overrides can implement recursive packages, another metadata path, or a separate library subdirectory. `PluginSystem` accepts only filesystem plugins returned by this factory.
 
 In Bundle layout, `name` belongs to `BundlePluginFactory`, while `displayName` belongs to `PluginSystem`. They happen to coexist in the same root metadata object and do not describe the same thing.
 

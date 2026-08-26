@@ -13,46 +13,66 @@ namespace {
 
     class DefaultPluginFactoryProbe : public stdc::plugin::PluginFactory {
     public:
-        bool scan(const std::filesystem::path &path,
+        bool scan(std::string_view iid, const std::filesystem::path &path,
                   std::vector<std::filesystem::path> *pluginPaths) const {
-            return scanPluginPaths(path, pluginPaths);
+            return scanPluginPaths(iid, path, pluginPaths);
         }
 
-        bool resolve(const std::filesystem::path &path, std::filesystem::path *pluginPath,
+        bool resolve(std::string_view iid, const std::filesystem::path &path,
+                     std::filesystem::path *pluginPath,
                      std::optional<std::filesystem::path> *metadataPath) const {
-            return resolvePluginPath(path, pluginPath, metadataPath);
+            return resolvePluginPath(iid, path, pluginPath, metadataPath);
         }
     };
 
     class TestPluginFactory : public stdc::plugin::PluginFactory {
     protected:
-        bool scanPluginPaths(const std::filesystem::path &,
+        bool scanPluginPaths(std::string_view iid, const std::filesystem::path &,
                              std::vector<std::filesystem::path> *pluginPaths) const override {
+            scannedIid = iid;
             pluginPaths->push_back("candidate");
             return true;
         }
 
-        bool resolvePluginPath(const std::filesystem::path &, std::filesystem::path *pluginPath,
+        bool resolvePluginPath(std::string_view iid, const std::filesystem::path &,
+                               std::filesystem::path *pluginPath,
                                std::optional<std::filesystem::path> *metadataPath) const override {
+            resolvedIid = iid;
             *pluginPath = TEST_PLUGINLOADER_PLUGIN_PATH;
             *metadataPath = TEST_PLUGINLOADER_METADATA_PATH;
             return true;
         }
+
+    public:
+        mutable std::string scannedIid;
+        mutable std::string resolvedIid;
     };
 
     class RetryPluginFactory : public TestPluginFactory {
     protected:
-        bool scanPluginPaths(const std::filesystem::path &path,
+        bool scanPluginPaths(std::string_view iid, const std::filesystem::path &path,
                              std::vector<std::filesystem::path> *pluginPaths) const override {
             if (_firstScan) {
                 _firstScan = false;
                 return false;
             }
-            return TestPluginFactory::scanPluginPaths(path, pluginPaths);
+            return TestPluginFactory::scanPluginPaths(iid, path, pluginPaths);
         }
 
     private:
         mutable bool _firstScan = true;
+    };
+
+    class InvalidMetadataPluginFactory : public TestPluginFactory {
+    protected:
+        bool resolvePluginPath(std::string_view iid, const std::filesystem::path &,
+                               std::filesystem::path *pluginPath,
+                               std::optional<std::filesystem::path> *metadataPath) const override {
+            resolvedIid = iid;
+            *pluginPath = TEST_PLUGINLOADER_PLUGIN_PATH;
+            *metadataPath = TEST_PLUGINLOADER_LIBRARY_PATH;
+            return true;
+        }
     };
 
     class TemporaryPluginDirectory {
@@ -197,6 +217,8 @@ BOOST_AUTO_TEST_CASE(test_factory_scan_hooks) {
     factory.addPluginPath("org.stdcorelib.LoaderTest", root);
     const auto plugins = factory.plugins("org.stdcorelib.LoaderTest");
     BOOST_REQUIRE_EQUAL(plugins.size(), 1u);
+    BOOST_CHECK_EQUAL(factory.scannedIid, "org.stdcorelib.LoaderTest");
+    BOOST_CHECK_EQUAL(factory.resolvedIid, "org.stdcorelib.LoaderTest");
     BOOST_CHECK_EQUAL(plugins.front()->filePath(), TEST_PLUGINLOADER_PLUGIN_PATH);
 
     factory.addPluginPath("org.stdcorelib.LoaderTest", root);
@@ -214,6 +236,20 @@ BOOST_AUTO_TEST_CASE(test_factory_retries_failed_scan) {
     factory.addPluginPath("org.stdcorelib.LoaderTest", root);
     BOOST_CHECK(factory.plugins("org.stdcorelib.LoaderTest").empty());
     BOOST_CHECK_EQUAL(factory.plugins("org.stdcorelib.LoaderTest").size(), 1u);
+}
+
+BOOST_AUTO_TEST_CASE(test_factory_keeps_matching_plugin_with_invalid_external_metadata) {
+    const auto root = std::filesystem::path(TEST_PLUGINLOADER_METADATA_PATH).parent_path();
+
+    InvalidMetadataPluginFactory factory;
+    factory.addPluginPath("org.stdcorelib.LoaderTest", root);
+    const auto plugins = factory.plugins("org.stdcorelib.LoaderTest");
+
+    BOOST_REQUIRE_EQUAL(plugins.size(), 1u);
+    BOOST_CHECK_EQUAL(plugins.front()->state(), stdc::plugin::PluginLoader::Invalid);
+    BOOST_CHECK(plugins.front()->hasError());
+    BOOST_CHECK(plugins.front()->iid().empty());
+    BOOST_CHECK(plugins.front()->metadata().isNull());
 }
 
 BOOST_AUTO_TEST_CASE(test_factory_replaces_paths) {
@@ -256,15 +292,21 @@ BOOST_AUTO_TEST_CASE(test_default_factory_scan) {
     DefaultPluginFactoryProbe factory;
 
     std::vector<std::filesystem::path> candidates;
-    BOOST_REQUIRE(factory.scan(directory.path(), &candidates));
+    BOOST_REQUIRE(factory.scan("org.stdcorelib.LoaderTest", directory.path(), &candidates));
     BOOST_REQUIRE_EQUAL(candidates.size(), 1u);
-    BOOST_CHECK_EQUAL(candidates.front().filename(),
+    const auto candidate = candidates.front();
+    BOOST_CHECK_EQUAL(candidate.filename(),
                       std::filesystem::path(TEST_PLUGINLOADER_PLUGIN_PATH).filename());
+
+    candidates.clear();
+    BOOST_REQUIRE(factory.scan("org.stdcorelib.Other", directory.path(), &candidates));
+    BOOST_CHECK(candidates.empty());
 
     std::filesystem::path pluginPath;
     std::optional<std::filesystem::path> metadataPath = TEST_PLUGINLOADER_METADATA_PATH;
-    BOOST_REQUIRE(factory.resolve(candidates.front(), &pluginPath, &metadataPath));
-    BOOST_CHECK_EQUAL(pluginPath, candidates.front());
+    BOOST_REQUIRE(
+        factory.resolve("org.stdcorelib.LoaderTest", candidate, &pluginPath, &metadataPath));
+    BOOST_CHECK_EQUAL(pluginPath, candidate);
     BOOST_CHECK(!metadataPath);
 
     factory.addPluginPath("org.stdcorelib.LoaderTest", directory.path());

@@ -16,8 +16,6 @@
 #include <stdcorelib/stlextra/algorithms.h>
 #include <stdcorelib/support/sharedlibrary.h>
 
-#include "pluginloader_p.h"
-
 namespace fs = std::filesystem;
 
 STDC_INSTANTIATE_STATIC_REGISTRY_EXPORT(stdc::plugin::StaticPlugin, STDC_PLUGIN_EXPORT)
@@ -26,8 +24,13 @@ namespace stdc::plugin {
 
     namespace {
 
-        bool is_file_name(const fs::path &path) {
-            return !path.empty() && path != "." && path != ".." && path == path.filename();
+        bool is_relative_file_path(const fs::path &path) {
+            if (path.empty() || path.is_absolute() || path.has_root_name() ||
+                path.has_root_directory() || path.filename().empty() || path.filename() == ".") {
+                return false;
+            }
+            return std::none_of(path.begin(), path.end(),
+                                [](const auto &component) { return component == ".."; });
         }
 
     }
@@ -76,14 +79,14 @@ namespace stdc::plugin {
         bool scanSucceeded = true;
         for (const auto &root : it->second) {
             std::vector<std::filesystem::path> candidates;
-            if (!factory.scanPluginPaths(root, &candidates)) {
+            if (!factory.scanPluginPaths(iid, root, &candidates)) {
                 scanSucceeded = false;
                 continue;
             }
             for (const auto &candidate : candidates) {
                 std::filesystem::path pluginPath;
                 std::optional<std::filesystem::path> metadataPath;
-                if (!factory.resolvePluginPath(candidate, &pluginPath, &metadataPath)) {
+                if (!factory.resolvePluginPath(iid, candidate, &pluginPath, &metadataPath)) {
                     scanSucceeded = false;
                     continue;
                 }
@@ -100,9 +103,12 @@ namespace stdc::plugin {
                 }
 
                 auto loader = createLoader();
-                loader->setFilePath(canonical, metadataPath);
+                loader->setFilePath(canonical);
                 if (loader->iid() != iid) {
                     continue;
+                }
+                if (metadataPath) {
+                    loader->setFilePath(canonical, metadataPath);
                 }
 
                 readPluginFiles.insert(std::move(pluginFile));
@@ -126,7 +132,7 @@ namespace stdc::plugin {
 
     PluginFactory &PluginFactory::operator=(PluginFactory &&RHS) noexcept = default;
 
-    bool PluginFactory::scanPluginPaths(const std::filesystem::path &path,
+    bool PluginFactory::scanPluginPaths(std::string_view iid, const std::filesystem::path &path,
                                         std::vector<std::filesystem::path> *pluginPaths) const {
         std::error_code ec;
         fs::directory_iterator dir(path, ec);
@@ -138,9 +144,8 @@ namespace stdc::plugin {
         while (dir != end) {
             const auto candidate = dir->path();
             if (SharedLibrary::isLibrary(candidate)) {
-                std::string text;
-                std::string errorMessage;
-                if (PluginLoader::Impl::decodeEmbeddedText(candidate, &text, &errorMessage)) {
+                const PluginLoader loader(candidate);
+                if (loader.iid() == iid) {
                     pluginPaths->push_back(candidate);
                 }
             }
@@ -155,7 +160,7 @@ namespace stdc::plugin {
     }
 
     bool
-        PluginFactory::resolvePluginPath(const std::filesystem::path &path,
+        PluginFactory::resolvePluginPath(std::string_view, const std::filesystem::path &path,
                                          std::filesystem::path *pluginPath,
                                          std::optional<std::filesystem::path> *metadataPath) const {
         *pluginPath = path;
@@ -270,7 +275,7 @@ namespace stdc::plugin {
     BundlePluginFactory::BundlePluginFactory(fs::path metadataFileName)
         : PluginFactory(std::make_unique<Impl>(std::move(metadataFileName))) {
         stdc_impl_t;
-        assert(is_file_name(impl.metadataFileName));
+        assert(is_relative_file_path(impl.metadataFileName));
     }
 
     BundlePluginFactory::~BundlePluginFactory() = default;
@@ -285,9 +290,9 @@ namespace stdc::plugin {
         return impl.metadataFileName;
     }
 
-    bool BundlePluginFactory::scanPluginPaths(const fs::path &path,
+    bool BundlePluginFactory::scanPluginPaths(std::string_view, const fs::path &path,
                                               std::vector<fs::path> *pluginPaths) const {
-        if (!is_file_name(metadataFileName())) {
+        if (!is_relative_file_path(metadataFileName())) {
             return false;
         }
 
@@ -313,9 +318,10 @@ namespace stdc::plugin {
         return true;
     }
 
-    bool BundlePluginFactory::resolvePluginPath(const fs::path &path, fs::path *pluginPath,
+    bool BundlePluginFactory::resolvePluginPath(std::string_view, const fs::path &path,
+                                                fs::path *pluginPath,
                                                 std::optional<fs::path> *metadataPath) const {
-        if (!is_file_name(metadataFileName())) {
+        if (!is_relative_file_path(metadataFileName())) {
             return false;
         }
 

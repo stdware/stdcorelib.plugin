@@ -73,14 +73,16 @@ namespace stdc::plugin {
         /// Finds candidate plugin paths under a registered search directory.
         ///
         /// The default implementation examines each library file directly under \a path and
-        /// silently ignores files without embedded plugin metadata.
+        /// silently ignores files without embedded plugin metadata or whose IID differs from
+        /// \a iid.
         ///
+        /// \param iid The IID currently being discovered.
         /// \param path The directory registered with \c addPluginPath().
         /// \param pluginPaths Receives the candidate paths to resolve.
         /// \return Whether the directory was scanned successfully.
         /// \warning This is called while the factory is locked. An override must not call any
         ///          function on this factory.
-        virtual bool scanPluginPaths(const std::filesystem::path &path,
+        virtual bool scanPluginPaths(std::string_view iid, const std::filesystem::path &path,
                                      std::vector<std::filesystem::path> *pluginPaths) const;
 
         /// Resolves a candidate into the paths passed to \c PluginLoader::setFilePath().
@@ -88,13 +90,14 @@ namespace stdc::plugin {
         /// The default implementation returns \a path unchanged and clears \a metadataPath, which
         /// makes the loader use its embedded metadata.
         ///
+        /// \param iid The IID currently being discovered.
         /// \param path A candidate returned by \c scanPluginPaths().
         /// \param pluginPath Receives the plugin library path.
         /// \param metadataPath Receives an optional external metadata JSON path.
         /// \return Whether the candidate was resolved successfully.
         /// \warning This is called while the factory is locked. An override must not call any
         ///          function on this factory.
-        virtual bool resolvePluginPath(const std::filesystem::path &path,
+        virtual bool resolvePluginPath(std::string_view iid, const std::filesystem::path &path,
                                        std::filesystem::path *pluginPath,
                                        std::optional<std::filesystem::path> *metadataPath) const;
 
@@ -114,24 +117,25 @@ namespace stdc::plugin {
     /// \c editor.dll, \c libeditor.so, or \c libeditor.dylib.
     class STDC_PLUGIN_EXPORT BundlePluginFactory : public PluginFactory {
     public:
-        /// Creates a bundle factory with a configurable metadata file name.
+        /// Creates a bundle factory with a configurable metadata path.
         ///
-        /// \param metadataFileName The metadata file name inside each bundle.
+        /// \param metadataFileName The metadata path relative to each bundle.
         ///
-        /// \pre \a metadataFileName is nonempty and contains no directory components.
+        /// \pre \a metadataFileName is nonempty, relative, and does not contain \c .. components.
         explicit BundlePluginFactory(std::filesystem::path metadataFileName = "plugin.json");
         ~BundlePluginFactory() override;
 
         BundlePluginFactory(BundlePluginFactory &&RHS) noexcept;
         BundlePluginFactory &operator=(BundlePluginFactory &&RHS) noexcept;
 
-        /// The metadata file name inside each bundle.
+        /// The metadata path relative to each bundle.
         const std::filesystem::path &metadataFileName() const;
 
     protected:
-        bool scanPluginPaths(const std::filesystem::path &path,
+        bool scanPluginPaths(std::string_view iid, const std::filesystem::path &path,
                              std::vector<std::filesystem::path> *pluginPaths) const override;
-        bool resolvePluginPath(const std::filesystem::path &path, std::filesystem::path *pluginPath,
+        bool resolvePluginPath(std::string_view iid, const std::filesystem::path &path,
+                               std::filesystem::path *pluginPath,
                                std::optional<std::filesystem::path> *metadataPath) const override;
 
         /// Resolves the plugin library described by bundle metadata.
