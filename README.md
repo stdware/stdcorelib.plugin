@@ -6,21 +6,21 @@ Plugin management module.
 
 `stdcorelib-plugin` contains two layers.
 
-- The `stdc::plugin` namespace provides plugin instances, manifest loading, dynamic library loading, static registration, runtime registration, and filesystem discovery.
+- The `stdc::plugin` namespace provides plugin instances, metadata loading, dynamic library loading, static registration, runtime registration, and filesystem discovery.
 - The `stdc::pluginsystem` namespace builds an application lifecycle, dependency graph, and enabled-state settings on top of that foundation.
 
 ## Plugin Foundation
 
 The base layer treats a plugin as an implementation of an interface identified by an IID. It does not interpret extension-specific metadata.
 
-### Plugin Manifest
+### Plugin Metadata
 
-A `PluginLoader` manifest is a JSON object. It reserves two root fields:
+A plugin has two independent pieces of descriptive information:
 
-- `iid` is required, must be a non-empty string, and identifies the extension point implemented by the plugin.
-- `metadata` is optional, must be an object when present, and belongs entirely to the extension point named by `iid`. Its contents are user-defined.
+- Its IID is a required non-empty string that identifies the extension point implemented by the plugin.
+- Its metadata is a JSON object owned by that extension point. `PluginLoader` does not reserve or interpret any field in it.
 
-All other root fields are open to the user. `PluginLoader` preserves the complete manifest and does not interpret those additional fields.
+For a dynamic plugin, the IID and metadata are embedded in the library using this internal envelope:
 
 ```json
 {
@@ -31,7 +31,9 @@ All other root fields are open to the user. `PluginLoader` preserves the complet
 }
 ```
 
-The base contract has no schema-version field such as `$version`. An extension point can define and version its own `metadata` object when needed.
+The envelope belongs to the loader and is not the user metadata object returned by `PluginLoader::metadata()`. The metadata itself may use fields such as `iid`, `metadata`, or `name` with any meaning defined by the extension point.
+
+The base contract has no schema-version field such as `$version`. An extension point can define and version its metadata when needed.
 
 ### Dynamic Plugins
 
@@ -54,23 +56,36 @@ public:
 STDC_EXPORT_PLUGIN(SoftwareRenderer)
 ```
 
-To embed the manifest:
+To embed the IID and metadata:
 
 - Link the plugin target to `stdcorelib::plugin`.
-- Call `stdc_add_plugin_manifest()` with the target and manifest path.
+- Call `stdc_add_plugin_metadata()` with the target, IID, and optional metadata path.
+- Make the metadata file itself a JSON object containing only user metadata. Omitting `METADATA` embeds an empty object.
 - On macOS, let that function give a `MODULE` target the `.dylib` suffix used by plugin discovery.
+
+For example, `software_renderer.json` can contain:
+
+```json
+{
+    "backend": "software"
+}
+```
 
 ```cmake
 add_library(software_renderer MODULE softwarerenderer.cpp)
 target_link_libraries(software_renderer PRIVATE stdcorelib::plugin)
-stdc_add_plugin_manifest(software_renderer software_renderer.json)
+stdc_add_plugin_metadata(
+    TARGET software_renderer
+    IID org.example.Renderer
+    METADATA software_renderer.json
+)
 ```
 
 ### Direct Loading
 
 `PluginLoader` manages exactly one plugin:
 
-- A filesystem plugin reads its manifest without executing plugin code.
+- A filesystem plugin reads its IID and metadata without executing plugin code.
   - `load()` opens the library and obtains its instance.
   - `unload()` releases the library and invalidates the returned pointer.
 - A static plugin obtains its registered instance when loaded.
@@ -91,15 +106,15 @@ loader.unload();
 
 The filesystem interface has two additional rules:
 
-- Pass a second path to the constructor or `setFilePath()` to read an external JSON manifest instead of the embedded manifest.
-- Inspect failed manifest reads and failed loads through `state()`, `hasError()`, and `errorMessage()`.
+- Pass a second path to the constructor or `setFilePath()` to replace the embedded user metadata with an external JSON object. The IID still comes from the library.
+- Inspect failed metadata reads and failed loads through `state()`, `hasError()`, and `errorMessage()`.
 
 ### Plugin Discovery
 
 `PluginFactory` owns loaders and discovers filesystem plugins lazily for a requested IID. Its default policy:
 
 - Examines dynamic libraries directly below each search path.
-- Accepts only libraries with readable embedded manifests.
+- Accepts only libraries with readable embedded plugin information.
 - Silently ignores candidates whose IID does not match the requested IID.
 
 ```cpp
@@ -126,8 +141,8 @@ for (auto loader : factory.plugins("org.example.Renderer")) {
 
 Discovery has the following extension and lifetime rules:
 
-- `BundlePluginFactory` provides the common external-manifest layout: every immediate child directory is a bundle, its root `name` selects the platform library name, and its constructor can replace `plugin.json` with another manifest file name.
-- Subclasses can override `scanPluginPaths()` and `resolvePluginPath()` to implement another directory layout or external manifest policy.
+- `BundlePluginFactory` provides the common external-metadata layout: every immediate child directory is a bundle, its root `name` selects the platform library name, and its constructor can replace `plugin.json` with another metadata file name.
+- Subclasses can override `scanPluginPaths()` and `resolvePluginPath()` to implement another directory layout or external metadata policy.
 - Replacing search paths discards previously discovered filesystem loaders that are not loaded.
 - Loaded plugins are not unloaded when search paths change.
 - Programs should set all search paths before the first query or load.
@@ -137,35 +152,30 @@ Discovery has the following extension and lifetime rules:
 Static registration is lazy:
 
 - `STDC_EXPORT_STATIC_PLUGIN` registers a static plugin for an IID.
-- The manifest is evaluated when it is first requested.
+- The metadata is evaluated when it is first requested.
 - The plugin instance is created when its loader is loaded.
 
 ```cpp
 STDC_EXPORT_STATIC_PLUGIN(
     SoftwareRenderer,
     "org.example.Renderer",
-    (stdc::json::Object{
-        {"iid", "org.example.Renderer"},
-        {"metadata", stdc::json::Object{{"backend", "software"}}},
-    })
+    (stdc::json::Object{{"backend", "software"}})
 )
 
 stdc::plugin::PluginFactory factory;
 factory.addStaticPlugins("org.example.Renderer");
 ```
 
-For a runtime plugin, the caller creates and owns the instance, then passes it together with its complete manifest:
+For a runtime plugin, the caller creates and owns the instance, then passes its IID and metadata separately:
 
 ```cpp
 SoftwareRenderer renderer;
 
 stdc::plugin::PluginFactory factory;
 factory.addRuntimePlugin(
+    "org.example.Renderer",
     &renderer,
-    stdc::json::Object{
-        {"iid", "org.example.Renderer"},
-        {"metadata", stdc::json::Object{{"backend", "software"}}},
-    }
+    stdc::json::Object{{"backend", "software"}}
 );
 ```
 
@@ -186,51 +196,44 @@ Static and runtime plugins differ only in how their instances enter the factory:
 - Applies a host load predicate for platform and product policy.
 - Controls plugin startup and shutdown.
 
-### Plugin System Manifest
+### Plugin System Metadata
 
-`PluginSystem` retains the `PluginLoader` contract and reserves additional fields:
-
-- The root `iid` field is still required and must match the IID passed to the `PluginSystem` constructor.
-- The root `metadata` field is required and follows the `PluginSystem` schema below.
-- The root `name` field is reserved by the `Bundle` layout and gives the plugin library's platform-independent name. It is separate from the user-visible `metadata.name` field.
-- Other root fields remain user-defined and are not interpreted by `PluginSystem`.
-
-The `metadata` object has the following schema:
-
-```json
-{
-    "iid": "org.example.ApplicationPlugin",
-    "metadata": {
-        "id": "org.example.editor",
-        "name": "Editor",
-        "version": "2.1.0",
-        "compatVersion": "2.0.0",
-        "enabledByDefault": true,
-        "dependencies": [
-            {
-                "id": "org.example.core",
-                "version": "3.0.0",
-                "type": "required"
-            },
-            {
-                "id": "org.example.diagnostics",
-                "version": "1.0.0",
-                "type": "optional"
-            }
-        ]
-    }
-}
-```
-
-The fields inside `metadata` have these meanings:
+`PluginSystem` is a metadata consumer and reserves these root fields:
 
 - `id` is required, identifies the plugin, and must be unique within the system.
-- `name` is required display text and may repeat.
+- `displayName` is required display text and may repeat.
 - `version` is required and gives the current plugin version.
 - `compatVersion` is optional and defaults to `version`.
 - `enabledByDefault` is optional and defaults to `true`.
 - `dependencies` is optional and defaults to an empty array. Each entry uses the reserved `id`, `version`, and `type` fields.
-- Any other field is user-defined and is not interpreted by `PluginSystem`. The complete object remains available through `PluginSpec::manifest()`.
+
+The IID is not part of this object. It comes from the plugin library and must match the IID passed to the `PluginSystem` constructor.
+
+The metadata has the following schema:
+
+```json
+{
+    "id": "org.example.editor",
+    "displayName": "Editor",
+    "version": "2.1.0",
+    "compatVersion": "2.0.0",
+    "enabledByDefault": true,
+    "dependencies": [
+        {
+            "id": "org.example.core",
+            "version": "3.0.0",
+            "type": "required"
+        },
+        {
+            "id": "org.example.diagnostics",
+            "version": "1.0.0",
+            "type": "optional"
+        }
+    ]
+}
+```
+
+Any other field is user-defined and is not interpreted by `PluginSystem`. The complete object remains available through `PluginSpec::metadata()`. A custom field must not reuse a field required by `PluginSystem` with an incompatible type or meaning; doing so is undefined behavior.
 
 A plugin with compatibility version `C` and current version `V` satisfies a requested version `R` when `C <= R <= V`.
 
@@ -238,9 +241,11 @@ A plugin with compatibility version `C` and current version `V` satisfies a requ
 
 `PluginSystem` supports three filesystem layouts:
 
-- `Flat` is the default. It puts plugin libraries directly below each search path and reads their embedded manifests.
-- `Bundle` gives every plugin a child directory containing its library and a sidecar `plugin.json`. The manifest must contain a root `name` without a platform library prefix or suffix. For example, `"name": "editor"` can resolve to `editor.dll`, `libeditor.dll`, `libeditor.so`, or `libeditor.dylib`.
-- `CustomLayout` is reported when the constructor receives a user-provided `PluginFactory`. Its `scanPluginPaths()` and `resolvePluginPath()` overrides can implement recursive packages, another manifest name, or a separate library subdirectory. `PluginSystem` accepts only filesystem plugins returned by this factory.
+- `Flat` is the default. It puts plugin libraries directly below each search path and reads their embedded metadata.
+- `Bundle` gives every plugin a child directory containing its library and a sidecar `plugin.json`. The metadata must contain a root `name` without a platform library prefix or suffix. For example, `"name": "editor"` can resolve to `editor.dll`, `libeditor.dll`, `libeditor.so`, or `libeditor.dylib`.
+- `CustomLayout` is reported when the constructor receives a user-provided `PluginFactory`. Its `scanPluginPaths()` and `resolvePluginPath()` overrides can implement recursive packages, another metadata file name, or a separate library subdirectory. `PluginSystem` accepts only filesystem plugins returned by this factory.
+
+In Bundle layout, `name` belongs to `BundlePluginFactory`, while `displayName` belongs to `PluginSystem`. They happen to coexist in the same root metadata object and do not describe the same thing.
 
 ### Plugin Implementation
 
@@ -376,7 +381,7 @@ The lifecycle has the following ordering and ownership rules:
 
 `PluginSettings` represents one settings source and is independent of file I/O. A host supplies separate values to `PluginSystem`:
 
-- Global settings override the manifest value and produce `enabledByGlobalSettings()`.
+- Global settings override the metadata value and produce `enabledByGlobalSettings()`.
 - Local settings override the global result and produce the final `isEnabled()`.
 
 Each settings value has the following serialization behavior:
@@ -404,11 +409,11 @@ Disabled plugins affect dependency resolution as follows:
 
 ### Load Selection
 
-`setPluginLoadPredicate()` lets the host decide whether each valid spec applies to the current environment. The predicate runs once when loading starts and may inspect the complete manifest, including host-defined metadata such as an operating-system or application-edition constraint.
+`setPluginLoadPredicate()` lets the host decide whether each valid spec applies to the current environment. The predicate runs once when loading starts and may inspect the complete metadata, including host-defined fields such as an operating-system or application-edition constraint.
 
 ```cpp
 plugins.setPluginLoadPredicate([&](const PluginSpec &spec) {
-    const auto &platform = spec.manifest()["metadata"]["platform"];
+    const auto &platform = spec.metadata()["platform"];
     return platform.isNull() ||
            (platform.isString() && platform.toString() == currentPlatform);
 });

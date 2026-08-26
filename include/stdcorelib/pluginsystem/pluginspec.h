@@ -55,7 +55,7 @@ namespace stdc::pluginsystem {
         const std::string &id() const;
 
         /// The display name, which does not have to be unique.
-        const std::string &name() const;
+        const std::string &displayName() const;
 
         /// The plugin version.
         const VersionNumber &version() const;
@@ -66,10 +66,13 @@ namespace stdc::pluginsystem {
         /// The dependencies declared by this plugin.
         const std::vector<PluginDependency> &dependencies() const;
 
-        /// The complete plugin manifest.
-        const json::Value &manifest() const;
+        /// The complete plugin metadata object.
+        ///
+        /// \warning Custom fields must not reuse fields required by PluginSystem with incompatible
+        ///          types or meanings. Doing so is undefined behavior.
+        const json::Value &metadata() const;
 
-        /// Whether the manifest and global settings enable this plugin before local overrides.
+        /// Whether the metadata and global settings enable this plugin before local overrides.
         bool enabledByGlobalSettings() const;
 
         /// The effective enabled state, frozen when loadPlugins() starts.

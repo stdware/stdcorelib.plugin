@@ -38,21 +38,19 @@ namespace stdc::plugin {
         PluginFactory &operator=(PluginFactory &&RHS) noexcept;
 
     public:
-        /// Adds the static plugins registered for the IID in \a pluginSet.
-        ///
-        /// Which extension point each one plugs into comes out of its manifest, exactly as it
-        /// would for a plugin on disk.
-        void addStaticPlugins(std::string_view pluginSet);
+        /// Adds the static plugins registered for \a iid.
+        void addStaticPlugins(std::string_view iid);
 
         /// Adds an instance the program already owns.
         ///
-        /// \a manifest is the complete JSON object, including its \c iid. Ownership of \a plugin
-        /// stays with the caller.
-        void addRuntimePlugin(Plugin *plugin, const json::Value &manifest);
+        /// \a iid identifies the extension point. Ownership of \a plugin stays with the caller.
+        void addRuntimePlugin(std::string_view iid, Plugin *plugin,
+                              const json::Value &metadata = json::Object());
 
     public:
-        /// Adds a directory to search for \a iid. Each library carrying an embedded manifest is one
-        /// plugin.
+        /// Adds a directory to search for \a iid.
+        ///
+        /// Each library carrying embedded plugin metadata is one plugin.
         void addPluginPath(std::string_view iid, const std::filesystem::path &path);
 
         /// Replaces the directories searched for \a iid.
@@ -75,7 +73,7 @@ namespace stdc::plugin {
         /// Finds candidate plugin paths under a registered search directory.
         ///
         /// The default implementation examines each library file directly under \a path and
-        /// silently ignores files without an embedded plugin manifest.
+        /// silently ignores files without embedded plugin metadata.
         ///
         /// \param path The directory registered with \c addPluginPath().
         /// \param pluginPaths Receives the candidate paths to resolve.
@@ -87,18 +85,18 @@ namespace stdc::plugin {
 
         /// Resolves a candidate into the paths passed to \c PluginLoader::setFilePath().
         ///
-        /// The default implementation returns \a path unchanged and clears \a manifestPath, which
-        /// makes the loader read the embedded manifest.
+        /// The default implementation returns \a path unchanged and clears \a metadataPath, which
+        /// makes the loader use its embedded metadata.
         ///
         /// \param path A candidate returned by \c scanPluginPaths().
         /// \param pluginPath Receives the plugin library path.
-        /// \param manifestPath Receives an optional external manifest JSON path.
+        /// \param metadataPath Receives an optional external metadata JSON path.
         /// \return Whether the candidate was resolved successfully.
         /// \warning This is called while the factory is locked. An override must not call any
         ///          function on this factory.
         virtual bool resolvePluginPath(const std::filesystem::path &path,
                                        std::filesystem::path *pluginPath,
-                                       std::optional<std::filesystem::path> *manifestPath) const;
+                                       std::optional<std::filesystem::path> *metadataPath) const;
 
     protected:
         class Impl;
@@ -111,42 +109,42 @@ namespace stdc::plugin {
 
     /// Discovers plugin bundles stored one per child directory.
     ///
-    /// Each bundle has an external manifest and a plugin library. The manifest's root \c name
+    /// Each bundle has external metadata and a plugin library. The metadata's root \c name
     /// field gives the library's platform-independent name. For example, \c editor can resolve to
     /// \c editor.dll, \c libeditor.so, or \c libeditor.dylib.
     class STDC_PLUGIN_EXPORT BundlePluginFactory : public PluginFactory {
     public:
-        /// Creates a bundle factory with a configurable manifest file name.
+        /// Creates a bundle factory with a configurable metadata file name.
         ///
-        /// \param manifestFileName The manifest's file name inside each bundle.
+        /// \param metadataFileName The metadata file name inside each bundle.
         ///
-        /// \pre \a manifestFileName is nonempty and contains no directory components.
-        explicit BundlePluginFactory(std::filesystem::path manifestFileName = "plugin.json");
+        /// \pre \a metadataFileName is nonempty and contains no directory components.
+        explicit BundlePluginFactory(std::filesystem::path metadataFileName = "plugin.json");
         ~BundlePluginFactory() override;
 
         BundlePluginFactory(BundlePluginFactory &&RHS) noexcept;
         BundlePluginFactory &operator=(BundlePluginFactory &&RHS) noexcept;
 
-        /// The manifest's file name inside each bundle.
-        const std::filesystem::path &manifestFileName() const;
+        /// The metadata file name inside each bundle.
+        const std::filesystem::path &metadataFileName() const;
 
     protected:
         bool scanPluginPaths(const std::filesystem::path &path,
                              std::vector<std::filesystem::path> *pluginPaths) const override;
         bool resolvePluginPath(const std::filesystem::path &path, std::filesystem::path *pluginPath,
-                               std::optional<std::filesystem::path> *manifestPath) const override;
+                               std::optional<std::filesystem::path> *metadataPath) const override;
 
-        /// Resolves the plugin library described by a bundle manifest.
+        /// Resolves the plugin library described by bundle metadata.
         ///
         /// The default implementation reads the root \c name field, searches the bundle root, and
         /// accepts the platform's library prefix and suffix around that name.
         ///
         /// \param bundlePath The bundle directory returned by scanPluginPaths().
-        /// \param manifest The complete root object read from the bundle manifest.
+        /// \param metadata The complete root object read from the bundle metadata file.
         /// \return The library path, or nothing when no matching library exists.
         virtual std::optional<std::filesystem::path>
             resolveLibraryPath(const std::filesystem::path &bundlePath,
-                               const json::Value &manifest) const;
+                               const json::Value &metadata) const;
 
     private:
         class Impl;

@@ -18,8 +18,10 @@ set(_plugin_dir ${CMAKE_CURRENT_SOURCE_DIR}/plugins/test_pluginloader_plugin)
 add_library(test_pluginloader_plugin MODULE ${_plugin_dir}/test_pluginloader_plugin.cpp)
 target_link_libraries(test_pluginloader_plugin PRIVATE stdcorelib::plugin)
 set_target_properties(test_pluginloader_plugin PROPERTIES PREFIX "")
-stdc_add_plugin_manifest(test_pluginloader_plugin
-    ${_plugin_dir}/test_pluginloader_plugin.json
+stdc_add_plugin_metadata(
+    TARGET test_pluginloader_plugin
+    IID org.stdcorelib.LoaderTest
+    METADATA ${_plugin_dir}/test_pluginloader_plugin.json
 )
 
 add_library(test_pluginloader_library MODULE
@@ -27,14 +29,26 @@ add_library(test_pluginloader_library MODULE
 )
 set_target_properties(test_pluginloader_library PROPERTIES PREFIX "")
 
+add_library(test_pluginloader_metadata_only_library MODULE
+    ${CMAKE_CURRENT_SOURCE_DIR}/plugins/test_pluginloader_library.cpp
+)
+target_link_libraries(test_pluginloader_metadata_only_library PRIVATE stdcorelib::plugin)
+set_target_properties(test_pluginloader_metadata_only_library PROPERTIES PREFIX "")
+stdc_add_plugin_metadata(
+    TARGET test_pluginloader_metadata_only_library
+    IID org.stdcorelib.LoaderTest
+)
+
 set(_pluginsystem_plugin_dir ${CMAKE_CURRENT_SOURCE_DIR}/plugins/test_pluginsystem_plugin)
 add_library(test_pluginsystem_plugin MODULE
     ${_pluginsystem_plugin_dir}/test_pluginsystem_plugin.cpp
 )
 target_link_libraries(test_pluginsystem_plugin PRIVATE stdcorelib::plugin)
 set_target_properties(test_pluginsystem_plugin PROPERTIES PREFIX "")
-stdc_add_plugin_manifest(test_pluginsystem_plugin
-    ${_pluginsystem_plugin_dir}/test_pluginsystem_plugin.json
+stdc_add_plugin_metadata(
+    TARGET test_pluginsystem_plugin
+    IID org.stdcorelib.PluginSystem
+    METADATA ${_pluginsystem_plugin_dir}/test_pluginsystem_plugin.json
 )
 
 add_library(test_pluginsystem_failing_plugin MODULE
@@ -42,8 +56,20 @@ add_library(test_pluginsystem_failing_plugin MODULE
 )
 target_link_libraries(test_pluginsystem_failing_plugin PRIVATE stdcorelib::plugin)
 set_target_properties(test_pluginsystem_failing_plugin PROPERTIES PREFIX "")
-stdc_add_plugin_manifest(test_pluginsystem_failing_plugin
-    ${_pluginsystem_plugin_dir}/test_pluginsystem_plugin.json
+stdc_add_plugin_metadata(
+    TARGET test_pluginsystem_failing_plugin
+    IID org.stdcorelib.PluginSystem
+    METADATA ${_pluginsystem_plugin_dir}/test_pluginsystem_plugin.json
+)
+
+add_library(test_pluginsystem_wrong_type_plugin MODULE
+    ${_plugin_dir}/test_pluginloader_plugin.cpp
+)
+target_link_libraries(test_pluginsystem_wrong_type_plugin PRIVATE stdcorelib::plugin)
+set_target_properties(test_pluginsystem_wrong_type_plugin PROPERTIES PREFIX "")
+stdc_add_plugin_metadata(
+    TARGET test_pluginsystem_wrong_type_plugin
+    IID org.stdcorelib.PluginSystem
 )
 
 foreach(_name IN ITEMS provider consumer)
@@ -56,27 +82,29 @@ foreach(_name IN ITEMS provider consumer)
         TEST_PLUGINSYSTEM_LIFECYCLE_NAME="${_name}"
     )
     set_target_properties(${_target} PROPERTIES PREFIX "")
-    if(APPLE)
-        set_target_properties(${_target} PROPERTIES SUFFIX ".dylib")
-    endif()
+    stdc_add_plugin_metadata(TARGET ${_target} IID org.stdcorelib.PluginSystem)
 endforeach()
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     TEST_PLUGINLOADER_PLUGIN_PATH="$<TARGET_FILE:test_pluginloader_plugin>"
     TEST_PLUGINLOADER_LIBRARY_PATH="$<TARGET_FILE:test_pluginloader_library>"
-    TEST_PLUGINLOADER_MANIFEST_PATH="${_plugin_dir}/test_pluginloader_plugin.json"
+    TEST_PLUGINLOADER_METADATA_ONLY_LIBRARY_PATH="$<TARGET_FILE:test_pluginloader_metadata_only_library>"
+    TEST_PLUGINLOADER_METADATA_PATH="${_plugin_dir}/test_pluginloader_plugin.json"
     TEST_PLUGINSYSTEM_FAILING_PLUGIN_PATH="$<TARGET_FILE:test_pluginsystem_failing_plugin>"
     TEST_PLUGINSYSTEM_LIFECYCLE_CONSUMER_PATH="$<TARGET_FILE:test_pluginsystem_lifecycle_consumer>"
     TEST_PLUGINSYSTEM_LIFECYCLE_PROVIDER_PATH="$<TARGET_FILE:test_pluginsystem_lifecycle_provider>"
     TEST_PLUGINSYSTEM_PLUGIN_PATH="$<TARGET_FILE:test_pluginsystem_plugin>"
+    TEST_PLUGINSYSTEM_WRONG_TYPE_PLUGIN_PATH="$<TARGET_FILE:test_pluginsystem_wrong_type_plugin>"
 )
 add_dependencies(${PROJECT_NAME}
     test_pluginloader_library
+    test_pluginloader_metadata_only_library
     test_pluginloader_plugin
     test_pluginsystem_failing_plugin
     test_pluginsystem_lifecycle_consumer
     test_pluginsystem_lifecycle_provider
     test_pluginsystem_plugin
+    test_pluginsystem_wrong_type_plugin
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE stdcorelib::plugin)

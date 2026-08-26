@@ -3,6 +3,8 @@
 #ifndef STDCORELIB_PLUGIN_PLUGIN_H
 #define STDCORELIB_PLUGIN_PLUGIN_H
 
+#include <string_view>
+
 #include <stdcorelib/support/json.h>
 #include <stdcorelib/support/staticregistry.h>
 
@@ -26,19 +28,22 @@ namespace stdc::plugin {
 
     /// Describes a static plugin.
     ///
-    /// The functions provide its instance and manifest without creating the instance during
+    /// The functions provide its instance and metadata without creating the instance during
     /// registration.
     class StaticPlugin {
     public:
         using PluginInstanceFunction = Plugin *(*) ();
-        using ManifestFunction = json::Value (*)();
+        using MetadataFunction = json::Value (*)();
 
-        constexpr StaticPlugin(PluginInstanceFunction i, ManifestFunction m)
-            : instance(i), manifest(m) {
+        /// \pre \a pluginIID refers to storage that outlives this descriptor.
+        constexpr StaticPlugin(std::string_view pluginIID, PluginInstanceFunction i,
+                               MetadataFunction m)
+            : iid(pluginIID), instance(i), metadata(m) {
         }
 
+        std::string_view iid;
         PluginInstanceFunction instance = nullptr;
-        ManifestFunction manifest = nullptr;
+        MetadataFunction metadata = nullptr;
     };
 
     /// @}
@@ -77,9 +82,9 @@ extern template class STDC_PLUGIN_EXPORT stdc::StaticRegistry<stdc::plugin::Stat
 /// The entry-point symbol exported by a dynamic plugin.
 #define STDC_PLUGIN_INSTANCE_SYMBOL "stdc_plugin_instance"
 
-/// Places a generated manifest in the section inspected by \c PluginLoader.
+/// Places generated plugin metadata in the section inspected by \c PluginLoader.
 ///
-/// Plugin projects should call \c stdc_add_plugin_manifest instead of using this macro directly.
+/// Plugin projects should call \c stdc_add_plugin_metadata instead of using this macro directly.
 #if defined(_WIN32) && defined(_MSC_VER) && !defined(__clang__)
 #  pragma section(".stdcmd", read, shared)
 #  define STDC_PLUGIN_METADATA_SECTION __declspec(allocate(".stdcmd"))
@@ -100,13 +105,14 @@ extern template class STDC_PLUGIN_EXPORT stdc::StaticRegistry<stdc::plugin::Stat
 
 /// Registers \a PLUGIN_NAME for \a PLUGIN_IID at startup.
 ///
-/// \a PLUGIN_METADATA yields the complete manifest, including its \c iid. It is evaluated the
-/// first time the manifest is requested.
+/// \a PLUGIN_METADATA yields the user metadata object. It is evaluated the first time the
+/// metadata is requested.
 #define STDC_EXPORT_STATIC_PLUGIN(PLUGIN_NAME, PLUGIN_IID, PLUGIN_METADATA)                        \
     namespace {                                                                                    \
         stdc::plugin::StaticPluginRegistry::AddFactory                                             \
             PLUGIN_NAME##_initializer(PLUGIN_IID, "", []() -> stdc::plugin::StaticPlugin {         \
                 return stdc::plugin::StaticPlugin(                                                 \
+                    PLUGIN_IID,                                                                    \
                     []() -> stdc::plugin::Plugin * {                                               \
                         static PLUGIN_NAME _instance;                                              \
                         return &_instance;                                                         \

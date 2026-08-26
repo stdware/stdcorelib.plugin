@@ -1,8 +1,5 @@
 {
-    "iid": "org.stdcorelib.PluginSystem",
-    "metadata": {
-        "id": "org.stdcorelib.PluginSystemTest",
-        "name": "PluginSystem Test",
-        "version": "2.1.0"
-    }
+    "id": "org.stdcorelib.PluginSystemTest",
+    "displayName": "PluginSystem Test",
+    "version": "2.1.0"
 }

@@ -66,7 +66,7 @@ find_package(stdcorelib REQUIRED)
 # ----------------------------------
 # Main Project
 # ----------------------------------
-include(cmake/AddPluginManifest.cmake)
+include(cmake/AddPluginMetadata.cmake)
 
 file(GLOB _src
     src/plugin/*.cpp

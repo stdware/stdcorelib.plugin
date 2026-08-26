@@ -21,13 +21,13 @@ namespace stdc::pluginsystem {
         PluginSpec::State state = PluginSpec::Invalid;
         std::string errorMessage;
         std::string id;
-        std::string name;
+        std::string displayName;
         VersionNumber version;
         VersionNumber compatVersion;
         std::vector<PluginDependency> dependencies;
-        /// The raw \c metadata.enabledByDefault manifest value.
-        bool enabledByManifest = true;
-        /// The manifest value after the global settings override.
+        /// The raw \c enabledByDefault metadata value.
+        bool enabledByMetadata = true;
+        /// The metadata value after the global settings override.
         bool enabledByGlobalSettings = true;
         /// The global result after the local settings override.
         bool enabled = true;

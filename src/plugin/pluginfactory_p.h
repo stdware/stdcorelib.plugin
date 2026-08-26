@@ -25,7 +25,7 @@ namespace stdc::plugin {
         /// Discards filesystem loaders for \a iid that do not own a live plugin instance.
         void discardUnloadedFilePlugins(std::string_view iid) const;
 
-        /// Reads any manifest under the directories registered for \a iid that has not been read
+        /// Reads any plugin under the directories registered for \a iid that has not been read
         /// already.
         void scanPlugins(const PluginFactory &factory, std::string_view iid) const;
 
@@ -44,11 +44,11 @@ namespace stdc::plugin {
 
     class BundlePluginFactory::Impl : public PluginFactory::Impl {
     public:
-        explicit Impl(std::filesystem::path manifestFileName)
-            : manifestFileName(std::move(manifestFileName)) {
+        explicit Impl(std::filesystem::path metadataFileName)
+            : metadataFileName(std::move(metadataFileName)) {
         }
 
-        std::filesystem::path manifestFileName;
+        std::filesystem::path metadataFileName;
     };
 
 }

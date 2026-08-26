@@ -1,9 +1,11 @@
 {
-    "iid": "org.stdcorelib.LoaderTest",
+    "id": "org.stdcorelib.LoaderTest",
+    "displayName": "Loader Test",
+    "version": "1.0.0",
+    "answer": 42,
+    "iid": "user.metadata.iid",
     "metadata": {
-        "id": "org.stdcorelib.LoaderTest",
-        "name": "Loader Test",
-        "version": "1.0.0",
-        "answer": 42
-    }
+        "nested": true
+    },
+    "name": "user metadata name"
 }

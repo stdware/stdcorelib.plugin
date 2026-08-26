@@ -82,8 +82,8 @@ namespace stdc::plugin {
             }
             for (const auto &candidate : candidates) {
                 std::filesystem::path pluginPath;
-                std::optional<std::filesystem::path> manifestPath;
-                if (!factory.resolvePluginPath(candidate, &pluginPath, &manifestPath)) {
+                std::optional<std::filesystem::path> metadataPath;
+                if (!factory.resolvePluginPath(candidate, &pluginPath, &metadataPath)) {
                     scanSucceeded = false;
                     continue;
                 }
@@ -100,7 +100,7 @@ namespace stdc::plugin {
                 }
 
                 auto loader = createLoader();
-                loader->setFilePath(canonical, manifestPath);
+                loader->setFilePath(canonical, metadataPath);
                 if (loader->iid() != iid) {
                     continue;
                 }
@@ -138,9 +138,9 @@ namespace stdc::plugin {
         while (dir != end) {
             const auto candidate = dir->path();
             if (SharedLibrary::isLibrary(candidate)) {
-                std::string manifest;
+                std::string text;
                 std::string errorMessage;
-                if (PluginLoader::Impl::readEmbeddedManifest(candidate, &manifest, &errorMessage)) {
+                if (PluginLoader::Impl::decodeEmbeddedText(candidate, &text, &errorMessage)) {
                     pluginPaths->push_back(candidate);
                 }
             }
@@ -157,17 +157,17 @@ namespace stdc::plugin {
     bool
         PluginFactory::resolvePluginPath(const std::filesystem::path &path,
                                          std::filesystem::path *pluginPath,
-                                         std::optional<std::filesystem::path> *manifestPath) const {
+                                         std::optional<std::filesystem::path> *metadataPath) const {
         *pluginPath = path;
-        manifestPath->reset();
+        metadataPath->reset();
         return true;
     }
 
-    void PluginFactory::addStaticPlugins(std::string_view pluginSet) {
+    void PluginFactory::addStaticPlugins(std::string_view iid) {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
-        for (const StaticPlugin &plugin : PluginLoader::staticPlugins(pluginSet)) {
+        for (const StaticPlugin &plugin : PluginLoader::staticPlugins(iid)) {
             auto loader = std::make_unique<PluginLoader>(plugin);
             if (loader->iid().empty()) {
                 continue;
@@ -176,11 +176,12 @@ namespace stdc::plugin {
         }
     }
 
-    void PluginFactory::addRuntimePlugin(Plugin *plugin, const json::Value &manifest) {
+    void PluginFactory::addRuntimePlugin(std::string_view iid, Plugin *plugin,
+                                         const json::Value &metadata) {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
-        auto loader = std::make_unique<PluginLoader>(plugin, manifest);
+        auto loader = std::make_unique<PluginLoader>(iid, plugin, metadata);
         if (loader->iid().empty()) {
             return;
         }
@@ -266,10 +267,10 @@ namespace stdc::plugin {
     PluginFactory::PluginFactory(std::unique_ptr<Impl> impl) : _impl(std::move(impl)) {
     }
 
-    BundlePluginFactory::BundlePluginFactory(fs::path manifestFileName)
-        : PluginFactory(std::make_unique<Impl>(std::move(manifestFileName))) {
+    BundlePluginFactory::BundlePluginFactory(fs::path metadataFileName)
+        : PluginFactory(std::make_unique<Impl>(std::move(metadataFileName))) {
         stdc_impl_t;
-        assert(is_file_name(impl.manifestFileName));
+        assert(is_file_name(impl.metadataFileName));
     }
 
     BundlePluginFactory::~BundlePluginFactory() = default;
@@ -279,14 +280,14 @@ namespace stdc::plugin {
     BundlePluginFactory &
         BundlePluginFactory::operator=(BundlePluginFactory &&RHS) noexcept = default;
 
-    const fs::path &BundlePluginFactory::manifestFileName() const {
+    const fs::path &BundlePluginFactory::metadataFileName() const {
         stdc_impl_t;
-        return impl.manifestFileName;
+        return impl.metadataFileName;
     }
 
     bool BundlePluginFactory::scanPluginPaths(const fs::path &path,
                                               std::vector<fs::path> *pluginPaths) const {
-        if (!is_file_name(manifestFileName())) {
+        if (!is_file_name(metadataFileName())) {
             return false;
         }
 
@@ -299,7 +300,7 @@ namespace stdc::plugin {
         const fs::directory_iterator end;
         while (dir != end) {
             if (dir->is_directory(ec) && !ec &&
-                fs::is_regular_file(dir->path() / manifestFileName(), ec) && !ec) {
+                fs::is_regular_file(dir->path() / metadataFileName(), ec) && !ec) {
                 pluginPaths->push_back(dir->path());
             }
             ec.clear();
@@ -313,13 +314,13 @@ namespace stdc::plugin {
     }
 
     bool BundlePluginFactory::resolvePluginPath(const fs::path &path, fs::path *pluginPath,
-                                                std::optional<fs::path> *manifestPath) const {
-        if (!is_file_name(manifestFileName())) {
+                                                std::optional<fs::path> *metadataPath) const {
+        if (!is_file_name(metadataFileName())) {
             return false;
         }
 
-        const auto manifest = path / manifestFileName();
-        std::ifstream file(manifest);
+        const auto metadataFile = path / metadataFileName();
+        std::ifstream file(metadataFile);
         if (!file.is_open()) {
             return false;
         }
@@ -338,14 +339,14 @@ namespace stdc::plugin {
         }
 
         *pluginPath = std::move(*resolvedPath);
-        *manifestPath = manifest;
+        *metadataPath = metadataFile;
         return true;
     }
 
     std::optional<fs::path>
         BundlePluginFactory::resolveLibraryPath(const fs::path &bundlePath,
-                                                const json::Value &manifest) const {
-        const auto &name = manifest["name"];
+                                                const json::Value &metadata) const {
+        const auto &name = metadata["name"];
         if (!name.isString() || name.toString().empty()) {
             return std::nullopt;
         }

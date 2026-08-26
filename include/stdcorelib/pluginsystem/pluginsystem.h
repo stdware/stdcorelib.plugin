@@ -32,9 +32,9 @@ namespace stdc::pluginsystem {
     public:
         /// How filesystem plugins are arranged below each search path.
         enum PluginLayout {
-            /// Plugin libraries are directly below the search path and carry embedded manifests.
+            /// Plugin libraries are directly below the search path and carry embedded metadata.
             Flat,
-            /// Each child directory is a bundle containing a plugin library and external manifest.
+            /// Each child directory is a bundle containing a plugin library and external metadata.
             Bundle,
             /// Plugin discovery is provided by a custom PluginFactory.
             CustomLayout,

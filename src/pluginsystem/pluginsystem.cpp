@@ -43,7 +43,7 @@ namespace stdc::pluginsystem {
         for (auto &item : pluginData) {
             auto &data = item.second;
             data.enabledByGlobalSettings =
-                globalSettings.pluginEnabled(data.id).value_or(data.enabledByManifest);
+                globalSettings.pluginEnabled(data.id).value_or(data.enabledByMetadata);
             data.enabled =
                 localSettings.pluginEnabled(data.id).value_or(data.enabledByGlobalSettings);
         }

@@ -26,7 +26,7 @@ namespace stdc::plugin {
     }
 
     template <class Header, class Section>
-    static bool read_elf(std::ifstream &file, uint64_t fileSize, std::string *manifest) {
+    static bool read_elf(std::ifstream &file, uint64_t fileSize, std::string *text) {
         Header header{};
         file.seekg(0);
         file.read(reinterpret_cast<char *>(&header), sizeof(header));
@@ -70,15 +70,15 @@ namespace stdc::plugin {
                 if (!file) {
                     return false;
                 }
-                *manifest = std::move(bytes);
+                *text = std::move(bytes);
                 return true;
             }
         }
         return false;
     }
 
-    bool PluginLoader::Impl::readEmbeddedManifest(const fs::path &filePath, std::string *manifest,
-                                                  std::string *errorMessage) {
+    bool PluginLoader::Impl::decodeEmbeddedText(const fs::path &filePath, std::string *text,
+                                                std::string *errorMessage) {
         std::ifstream file(filePath, std::ios::binary);
         file.seekg(0, std::ios::end);
         auto end = file.tellg();
@@ -102,12 +102,12 @@ namespace stdc::plugin {
         }
         bool found = false;
         if (identity[EI_CLASS] == ELFCLASS32) {
-            found = read_elf<Elf32_Ehdr, Elf32_Shdr>(file, fileSize, manifest);
+            found = read_elf<Elf32_Ehdr, Elf32_Shdr>(file, fileSize, text);
         } else if (identity[EI_CLASS] == ELFCLASS64) {
-            found = read_elf<Elf64_Ehdr, Elf64_Shdr>(file, fileSize, manifest);
+            found = read_elf<Elf64_Ehdr, Elf64_Shdr>(file, fileSize, text);
         }
         if (!found) {
-            *errorMessage = "does not contain an embedded plugin manifest";
+            *errorMessage = "does not contain embedded plugin metadata";
         }
         return found;
     }

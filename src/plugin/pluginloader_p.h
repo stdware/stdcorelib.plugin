@@ -25,7 +25,7 @@ namespace stdc::plugin {
 
         std::string iid;
         std::filesystem::path filePath;
-        json::Value manifest;
+        json::Value metadata;
 
         /// Set for \c Static, which needs a way back to the instance it was registered with.
         StaticPlugin::PluginInstanceFunction staticInstance = nullptr;
@@ -35,15 +35,16 @@ namespace stdc::plugin {
 
     public:
         bool readLibrary(const std::filesystem::path &libraryPath,
-                         const std::optional<std::filesystem::path> &manifestPath = {});
-        bool validateManifest(const json::Value &root, std::string_view source,
-                              std::string *validatedIid);
-        bool readManifest(const json::Value &root, const std::filesystem::path &sourcePath);
+                         const std::optional<std::filesystem::path> &metadataPath = {});
+        bool validateMetadata(const json::Value &root, std::string_view source);
         bool setStaticPlugin(const StaticPlugin &plugin);
-        bool setRuntimePlugin(Plugin *plugin, const json::Value &manifest);
+        bool setRuntimePlugin(std::string_view iid, Plugin *plugin, const json::Value &metadata);
 
-        static bool readEmbeddedManifest(const std::filesystem::path &filePath,
-                                         std::string *manifest, std::string *errorMessage);
+        static bool readEmbeddedEnvelope(const json::Value &root,
+                                         const std::filesystem::path &sourcePath, std::string *iid,
+                                         json::Value *metadata, std::string *errorMessage);
+        static bool decodeEmbeddedText(const std::filesystem::path &filePath, std::string *text,
+                                       std::string *errorMessage);
 
         void reset();
         void clearError();

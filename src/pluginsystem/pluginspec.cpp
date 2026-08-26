@@ -17,7 +17,7 @@ namespace stdc::pluginsystem {
             return reportError(loader->errorMessage());
         }
 
-        const auto &metadata = loader->manifest()["metadata"];
+        const auto &metadata = loader->metadata();
         if (!metadata.isObject()) {
             return reportError("missing or invalid metadata object");
         }
@@ -34,8 +34,8 @@ namespace stdc::pluginsystem {
         if (!readString("id", &id)) {
             return reportError("missing or invalid plugin id");
         }
-        if (!readString("name", &name)) {
-            return reportError("missing or invalid plugin name");
+        if (!readString("displayName", &displayName)) {
+            return reportError("missing or invalid plugin display name");
         }
 
         std::string versionString;
@@ -69,9 +69,9 @@ namespace stdc::pluginsystem {
             if (!enabledValue.isBool()) {
                 return reportError("invalid plugin enabledByDefault value");
             }
-            enabledByManifest = enabledValue.toBool();
-            enabledByGlobalSettings = enabledByManifest;
-            enabled = enabledByManifest;
+            enabledByMetadata = enabledValue.toBool();
+            enabledByGlobalSettings = enabledByMetadata;
+            enabled = enabledByMetadata;
         }
 
         const auto &dependencyValues = metadata["dependencies"];
@@ -146,8 +146,8 @@ namespace stdc::pluginsystem {
         return _data->id;
     }
 
-    const std::string &PluginSpec::name() const {
-        return _data->name;
+    const std::string &PluginSpec::displayName() const {
+        return _data->displayName;
     }
 
     const VersionNumber &PluginSpec::version() const {
@@ -162,8 +162,8 @@ namespace stdc::pluginsystem {
         return _data->dependencies;
     }
 
-    const json::Value &PluginSpec::manifest() const {
-        return _data->loader->manifest();
+    const json::Value &PluginSpec::metadata() const {
+        return _data->loader->metadata();
     }
 
     bool PluginSpec::enabledByGlobalSettings() const {
