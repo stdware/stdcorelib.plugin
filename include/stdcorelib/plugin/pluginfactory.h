@@ -20,11 +20,14 @@ namespace stdc::plugin {
     /// @{
 
     class Plugin;
+    class PluginCatalog;
 
     /// Discovers plugins and owns their loaders.
     ///
     /// Filesystem plugins are discovered lazily by IID. Static plugins and instances supplied by
     /// the program can be added explicitly.
+    ///
+    /// The interface is thread-safe.
     ///
     /// Replacing the search paths discards unloaded filesystem plugins. Loaded plugins, static
     /// plugins, and runtime plugins stay in the factory. Programs should set all plugin paths
@@ -60,9 +63,6 @@ namespace stdc::plugin {
         void setPluginPaths(std::string_view iid, array_view<std::filesystem::path> paths);
         std::vector<std::filesystem::path> pluginPaths(std::string_view iid) const;
 
-        /// Whether the plugins for \a iid have been indexed since their configuration changed.
-        bool isIndexed(std::string_view iid) const;
-
     public:
         /// Everything found for \a iid, scanning the registered directories if they have not been
         /// scanned since they last changed.
@@ -83,8 +83,7 @@ namespace stdc::plugin {
         /// \param path The directory registered with \c addPluginPath().
         /// \param pluginPaths Receives the candidate paths to resolve.
         /// \return Whether the directory was scanned successfully.
-        /// \warning This is called while the factory is locked. An override must not call any
-        ///          function on this factory.
+        /// \warning An override must not call any function on this factory.
         virtual bool scanPluginPaths(std::string_view iid, const std::filesystem::path &path,
                                      std::vector<std::filesystem::path> *pluginPaths) const;
 
@@ -98,8 +97,7 @@ namespace stdc::plugin {
         /// \param pluginPath Receives the plugin library path.
         /// \param metadataPath Receives an optional external metadata JSON path.
         /// \return Whether the candidate was resolved successfully.
-        /// \warning This is called while the factory is locked. An override must not call any
-        ///          function on this factory.
+        /// \warning An override must not call any function on this factory.
         virtual bool resolvePluginPath(std::string_view iid, const std::filesystem::path &path,
                                        std::filesystem::path *pluginPath,
                                        std::optional<std::filesystem::path> *metadataPath) const;
@@ -109,6 +107,8 @@ namespace stdc::plugin {
         std::unique_ptr<Impl> _impl;
 
         explicit PluginFactory(std::unique_ptr<Impl> impl);
+
+        friend class PluginCatalog;
 
         STDC_DISABLE_COPY(PluginFactory)
     };

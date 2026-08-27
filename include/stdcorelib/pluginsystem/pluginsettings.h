@@ -19,6 +19,8 @@ namespace stdc::pluginsystem {
     /// @{
 
     /// One source of plugin enabled-state overrides and application-defined data.
+    ///
+    /// The interface is not thread-safe.
     class STDC_PLUGIN_EXPORT PluginSettings {
     public:
         /// Replaces the enabled-state override for \a id.

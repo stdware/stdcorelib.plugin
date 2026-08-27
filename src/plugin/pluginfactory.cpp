@@ -250,12 +250,6 @@ namespace stdc::plugin {
         return {it->second.begin(), it->second.end()};
     }
 
-    bool PluginFactory::isIndexed(std::string_view iid) const {
-        stdc_impl_t;
-        std::shared_lock<std::shared_mutex> lock(impl.plugins_mtx);
-        return !stdc::contains(impl.pluginsDirty, iid);
-    }
-
     std::vector<PluginLoader *> PluginFactory::plugins(std::string_view iid) const {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);

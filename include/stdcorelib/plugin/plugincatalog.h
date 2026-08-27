@@ -19,7 +19,7 @@ namespace stdc::plugin {
     /// Owns a plugin factory and indexes one IID by metadata keys.
     ///
     /// The catalog keeps the factory alive and updates its key index after the factory changes.
-    /// Loaders remain valid according to the factory's pointer invalidation rules.
+    /// The interface is thread-safe.
     class STDC_PLUGIN_EXPORT PluginCatalog {
     public:
         /// \param iid The extension point to request from \a factory.
@@ -38,11 +38,11 @@ namespace stdc::plugin {
         /// The factory owned by this catalog.
         PluginFactory *factory() const;
 
-        /// All plugins accepted for this catalog, in factory order.
-        const std::vector<PluginLoader *> &loaders() const;
+        /// A snapshot of all plugins accepted for this catalog, in factory order.
+        std::vector<PluginLoader *> loaders() const;
 
-        /// All advertised keys, retaining the first spelling and declaration order.
-        const std::vector<std::string> &keys() const;
+        /// A snapshot of all advertised keys, retaining first spelling and declaration order.
+        std::vector<std::string> keys() const;
 
         /// The first loader advertising \a key, or null when none does.
         PluginLoader *loader(std::string_view key) const;
@@ -78,8 +78,7 @@ namespace stdc::plugin {
         /// A missing or malformed field produces no keys. Overrides may use another metadata
         /// layout or return aliases; lookup itself always compares keys case-sensitively.
         ///
-        /// \warning This is called while the catalog index is being built. An override must not
-        ///          call a query function on this catalog.
+        /// \warning An override must not call a function on this catalog or the owned factory.
         virtual std::vector<std::string> keysFromMetadata(const json::Value &metadata) const;
 
     private:

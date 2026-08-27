@@ -24,6 +24,9 @@ namespace stdc::plugin {
     ///
     /// Filesystem metadata is read without executing plugin code. The library is not loaded until
     /// \c load() is called.
+    ///
+    /// The interface is not thread-safe. Concurrent calls to const functions on one loader are
+    /// safe while no thread calls a non-const function on it.
     class STDC_PLUGIN_EXPORT PluginLoader {
     public:
         PluginLoader();

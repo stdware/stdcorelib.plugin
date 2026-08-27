@@ -30,6 +30,13 @@ namespace stdc::plugin {
         /// already.
         void scanPlugins(const PluginFactory &factory, std::string_view iid) const;
 
+        /// Whether \a iid has been indexed since its configuration changed.
+        ///
+        /// The caller must hold \c plugins_mtx.
+        bool isIndexed(std::string_view iid) const {
+            return !stdc::contains(pluginsDirty, iid);
+        }
+
         std::map<std::string, vlarray<std::filesystem::path>, std::less<>> pluginPaths;
 
         /// Every loader, by the extension point it plugs into. The factory owns them all, which is

@@ -22,6 +22,9 @@ namespace stdc::pluginsystem {
     class PluginSpecData;
 
     /// Describes one plugin discovered by a PluginSystem.
+    ///
+    /// The interface is thread-safe after PluginSystem::loadPlugins() returns, except while
+    /// PluginSystem::shutdownPlugins() is running.
     class STDC_PLUGIN_EXPORT PluginSpec {
     public:
         /// The metadata and lifecycle state of this plugin.

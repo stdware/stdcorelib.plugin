@@ -124,6 +124,9 @@ namespace stdc::pluginsystem {
         void shutdownPlugins();
 
         /// Whether any plugin has an error.
+        ///
+        /// This function is thread-safe after loadPlugins() returns, except while
+        /// shutdownPlugins() is running.
         bool hasError() const;
 
     protected:

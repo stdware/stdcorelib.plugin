@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 
+#include <array>
+#include <atomic>
 #include <string>
+#include <thread>
 #include <type_traits>
 
 #include <stdcorelib/plugin/plugincatalog.h>
@@ -119,12 +122,13 @@ BOOST_AUTO_TEST_CASE(test_default_key_index_and_factory_ownership) {
         stdc::plugin::PluginCatalog catalog(EngineIID, std::move(factory));
         BOOST_CHECK_EQUAL(catalog.iid(), EngineIID);
 
-        const auto &loaders = catalog.loaders();
+        const auto loaders = catalog.loaders();
         BOOST_REQUIRE_EQUAL(loaders.size(), 3u);
 
         const std::vector<std::string> expectedKeys{"svg", "shared", "png"};
-        BOOST_CHECK_EQUAL_COLLECTIONS(catalog.keys().begin(), catalog.keys().end(),
-                                      expectedKeys.begin(), expectedKeys.end());
+        const auto keys = catalog.keys();
+        BOOST_CHECK_EQUAL_COLLECTIONS(keys.begin(), keys.end(), expectedKeys.begin(),
+                                      expectedKeys.end());
         BOOST_CHECK_EQUAL(catalog.loader("svg"), loaders[0]);
         BOOST_CHECK_EQUAL(catalog.loader("shared"), loaders[0]);
         BOOST_CHECK_EQUAL(catalog.loader("png"), loaders[1]);
@@ -147,9 +151,7 @@ BOOST_AUTO_TEST_CASE(test_default_key_index_and_factory_ownership) {
         catalog.factory()->addRuntimePlugin(
             EngineIID, &later,
             stdc::json::Object{{"keys", stdc::json::Array{"webp", "shared"}}});
-        BOOST_CHECK(!catalog.factory()->isIndexed(EngineIID));
         BOOST_CHECK(catalog.loader("webp"));
-        BOOST_CHECK(catalog.factory()->isIndexed(EngineIID));
         BOOST_CHECK_EQUAL(catalog.loaders().size(), 4u);
         BOOST_CHECK_EQUAL(catalog.loaders("shared").size(), 3u);
     }
@@ -173,9 +175,52 @@ BOOST_AUTO_TEST_CASE(test_custom_key_extraction_is_late_bound) {
     BOOST_CHECK(!catalog.loader("svg"));
 
     const std::vector<std::string> expectedKeys{"SVG", "theme"};
-    BOOST_CHECK_EQUAL_COLLECTIONS(catalog.keys().begin(), catalog.keys().end(),
-                                  expectedKeys.begin(), expectedKeys.end());
+    const auto keys = catalog.keys();
+    BOOST_CHECK_EQUAL_COLLECTIONS(keys.begin(), keys.end(), expectedKeys.begin(),
+                                  expectedKeys.end());
     BOOST_CHECK_EQUAL(catalog.extractionCount(), 1u);
+}
+
+BOOST_AUTO_TEST_CASE(test_concurrent_queries_follow_factory_changes) {
+    std::array<TestEngineFactory, 16> plugins;
+    auto factory = std::make_unique<stdc::plugin::PluginFactory>();
+    stdc::plugin::PluginCatalog catalog(EngineIID, std::move(factory));
+    BOOST_CHECK(catalog.keys().empty());
+
+    std::atomic<bool> start = false;
+    std::thread writer([&] {
+        while (!start.load(std::memory_order_acquire)) {
+            std::this_thread::yield();
+        }
+        for (size_t i = 0; i < plugins.size(); ++i) {
+            catalog.factory()->addRuntimePlugin(
+                EngineIID, &plugins[i],
+                stdc::json::Object{{"keys", stdc::json::Array{"engine-" + std::to_string(i)}}});
+        }
+    });
+
+    std::array<std::thread, 4> readers;
+    for (auto &reader : readers) {
+        reader = std::thread([&] {
+            while (!start.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
+            for (int i = 0; i < 100; ++i) {
+                catalog.keys();
+                catalog.loaders();
+                catalog.loader("engine-0");
+            }
+        });
+    }
+
+    start.store(true, std::memory_order_release);
+    writer.join();
+    for (auto &reader : readers) {
+        reader.join();
+    }
+
+    BOOST_CHECK_EQUAL(catalog.keys().size(), plugins.size());
+    BOOST_CHECK_EQUAL(catalog.loaders().size(), plugins.size());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

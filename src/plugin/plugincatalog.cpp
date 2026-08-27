@@ -15,18 +15,31 @@ namespace stdc::plugin {
         : iid(std::move(pluginIID)), factory(std::move(pluginFactory)) {
     }
 
-    void PluginCatalog::Impl::updateIndex(const PluginCatalog &catalog) const {
-        if (!indexed || !factory->isIndexed(iid)) {
-            rebuildIndex(catalog);
+    void PluginCatalog::Impl::updateIndex(const PluginCatalog &catalog,
+                                          PluginFactory::Impl &factoryImpl) const {
+        if (!indexed || !factoryImpl.isIndexed(iid)) {
+            rebuildIndex(catalog, factoryImpl);
         }
     }
 
-    void PluginCatalog::Impl::rebuildIndex(const PluginCatalog &catalog) const {
+    void PluginCatalog::Impl::rebuildIndex(const PluginCatalog &catalog,
+                                           PluginFactory::Impl &factoryImpl) const {
         loaders.clear();
         keys.clear();
         loadersByKey.clear();
 
-        for (auto loader : factory->plugins(iid)) {
+        if (!factoryImpl.isIndexed(iid)) {
+            factoryImpl.scanPlugins(*factory, iid);
+        }
+
+        auto foundLoaders = factoryImpl.loaders.find(iid);
+        if (foundLoaders == factoryImpl.loaders.end()) {
+            indexed = true;
+            return;
+        }
+
+        for (const auto &ownedLoader : foundLoaders->second) {
+            auto loader = ownedLoader.get();
             if (!loader || loader->iid() != iid) {
                 continue;
             }
@@ -74,33 +87,33 @@ namespace stdc::plugin {
         return impl.factory.get();
     }
 
-    const std::vector<PluginLoader *> &PluginCatalog::loaders() const {
+    std::vector<PluginLoader *> PluginCatalog::loaders() const {
         stdc_impl_t;
-        impl.updateIndex(*this);
-        return impl.loaders;
+        return impl.readIndex(*this, [&] { return impl.loaders; });
     }
 
-    const std::vector<std::string> &PluginCatalog::keys() const {
+    std::vector<std::string> PluginCatalog::keys() const {
         stdc_impl_t;
-        impl.updateIndex(*this);
-        return impl.keys;
+        return impl.readIndex(*this, [&] { return impl.keys; });
     }
 
     PluginLoader *PluginCatalog::loader(std::string_view key) const {
         stdc_impl_t;
-        impl.updateIndex(*this);
-        auto found = impl.loadersByKey.find(key);
-        return found == impl.loadersByKey.end() ? nullptr : found->second.front();
+        return impl.readIndex(*this, [&] {
+            auto found = impl.loadersByKey.find(key);
+            return found == impl.loadersByKey.end() ? nullptr : found->second.front();
+        });
     }
 
     std::vector<PluginLoader *> PluginCatalog::loaders(std::string_view key) const {
         stdc_impl_t;
-        impl.updateIndex(*this);
-        auto found = impl.loadersByKey.find(key);
-        if (found == impl.loadersByKey.end()) {
-            return {};
-        }
-        return {found->second.begin(), found->second.end()};
+        return impl.readIndex(*this, [&] {
+            auto found = impl.loadersByKey.find(key);
+            if (found == impl.loadersByKey.end()) {
+                return std::vector<PluginLoader *>();
+            }
+            return std::vector<PluginLoader *>(found->second.begin(), found->second.end());
+        });
     }
 
     std::vector<std::string> PluginCatalog::keysFromMetadata(const json::Value &metadata) const {
