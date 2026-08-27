@@ -60,6 +60,9 @@ namespace stdc::plugin {
         void setPluginPaths(std::string_view iid, array_view<std::filesystem::path> paths);
         std::vector<std::filesystem::path> pluginPaths(std::string_view iid) const;
 
+        /// Whether the plugins for \a iid have been indexed since their configuration changed.
+        bool isIndexed(std::string_view iid) const;
+
     public:
         /// Everything found for \a iid, scanning the registered directories if they have not been
         /// scanned since they last changed.

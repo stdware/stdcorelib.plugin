@@ -147,6 +147,28 @@ Discovery has the following extension and lifetime rules:
 - Loaded plugins are not unloaded when search paths change.
 - Programs should set all search paths before the first query or load.
 
+### Keyed Plugin Catalogs
+
+`PluginCatalog` takes ownership of a `PluginFactory` and indexes the plugins for one IID by metadata key. Its default policy reads the root `keys` array, compares keys case-sensitively, returns the first matching loader from `loader()`, and retains all matches for `loaders()`. The owned factory remains available through `factory()`, and later factory changes are reflected by the next catalog query.
+
+```json
+{
+    "keys": ["svg", "svgz"]
+}
+```
+
+```cpp
+auto factory = std::make_unique<stdc::plugin::PluginFactory>();
+factory->setPluginPaths("org.example.IconEngine", iconEnginePaths);
+
+stdc::plugin::PluginCatalog engines("org.example.IconEngine", std::move(factory));
+if (auto loader = engines.loader("svg")) {
+    loader->load();
+}
+```
+
+Subclasses can override `keysFromMetadata()` to use another metadata layout or provide aliases. The index is built on the first query, after derived construction has completed, and rebuilt after the factory changes.
+
 ### Static And Runtime Plugins
 
 Static registration is lazy:

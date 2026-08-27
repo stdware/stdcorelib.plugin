@@ -179,6 +179,7 @@ namespace stdc::plugin {
             }
             impl.loaders[loader->iid()].emplace_back(std::move(loader));
         }
+        impl.pluginsDirty.insert(std::string(iid));
     }
 
     void PluginFactory::addRuntimePlugin(std::string_view iid, Plugin *plugin,
@@ -191,6 +192,7 @@ namespace stdc::plugin {
             return;
         }
         impl.loaders[loader->iid()].emplace_back(std::move(loader));
+        impl.pluginsDirty.insert(std::string(iid));
     }
 
     void PluginFactory::addPluginPath(std::string_view iid, const std::filesystem::path &path) {
@@ -246,6 +248,12 @@ namespace stdc::plugin {
             return {};
         }
         return {it->second.begin(), it->second.end()};
+    }
+
+    bool PluginFactory::isIndexed(std::string_view iid) const {
+        stdc_impl_t;
+        std::shared_lock<std::shared_mutex> lock(impl.plugins_mtx);
+        return !stdc::contains(impl.pluginsDirty, iid);
     }
 
     std::vector<PluginLoader *> PluginFactory::plugins(std::string_view iid) const {

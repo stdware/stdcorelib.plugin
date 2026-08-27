@@ -8,6 +8,7 @@
 #include <shared_mutex>
 
 #include <stdcorelib/adt/vlarray.h>
+#include <stdcorelib/stlextra/algorithms.h>
 
 #include <stdcorelib/plugin/pluginfactory.h>
 
