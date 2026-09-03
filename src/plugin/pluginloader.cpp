@@ -244,16 +244,19 @@ namespace stdc::plugin {
     PluginLoader::PluginLoader(const std::filesystem::path &filePath,
                                const std::optional<std::filesystem::path> &metadataPath)
         : PluginLoader() {
-        _impl->readLibrary(filePath, metadataPath);
+        stdc_impl_t;
+        impl.readLibrary(filePath, metadataPath);
     }
 
     PluginLoader::PluginLoader(const StaticPlugin &plugin) : PluginLoader() {
-        _impl->setStaticPlugin(plugin);
+        stdc_impl_t;
+        impl.setStaticPlugin(plugin);
     }
 
     PluginLoader::PluginLoader(std::string_view iid, Plugin *plugin, const json::Value &metadata)
         : PluginLoader() {
-        _impl->setRuntimePlugin(iid, plugin, metadata);
+        stdc_impl_t;
+        impl.setRuntimePlugin(iid, plugin, metadata);
     }
 
     PluginLoader::~PluginLoader() = default;

@@ -71,13 +71,7 @@ namespace stdc::plugin {
 
 }
 
-#if !defined(STDC_PLUGIN_LIBRARY) && defined(_MSC_VER)
-// MSVC needs the dllimport declaration when inline registry code references the
-// exported _head and _tail data members. GNU-family compilers must instantiate
-// AddFactory locally because an outer explicit instantiation does not instantiate
-// the nested class.
-extern template class STDC_PLUGIN_EXPORT stdc::StaticRegistry<stdc::plugin::StaticPlugin>;
-#endif
+STDC_DECLARE_EXPORTED_STATIC_REGISTRY(stdc::plugin::StaticPlugin, STDC_PLUGIN_EXPORT)
 
 /// The entry-point symbol exported by a dynamic plugin.
 #define STDC_PLUGIN_INSTANCE_SYMBOL "stdc_plugin_instance"

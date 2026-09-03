@@ -18,7 +18,7 @@
 
 namespace fs = std::filesystem;
 
-STDC_INSTANTIATE_STATIC_REGISTRY_EXPORT(stdc::plugin::StaticPlugin, STDC_PLUGIN_EXPORT)
+STDC_STATIC_REGISTRY(stdc::plugin::StaticPlugin)
 
 namespace stdc::plugin {
 
