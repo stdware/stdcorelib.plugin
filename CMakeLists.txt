@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 project(stdcorelib-plugin
     VERSION 0.1.0.0
     LANGUAGES CXX
-    DESCRIPTION "Plugin management module"
+    DESCRIPTION "Portable C++ Plugin Management Library."
     HOMEPAGE_URL "https://github.com/stdware/stdcorelib.plugin"
 )
 

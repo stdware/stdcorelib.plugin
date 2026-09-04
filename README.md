@@ -1,6 +1,6 @@
 # STDCORELIB.PLUGIN
 
-Plugin management module.
+Portable C++ Plugin Management Library.
 
 ## Introduction
 
@@ -8,6 +8,60 @@ Plugin management module.
 
 - The `stdc::plugin` namespace provides plugin instances, metadata loading, dynamic library loading, static registration, runtime registration, and filesystem discovery.
 - The `stdc::pluginsystem` namespace builds an application lifecycle, dependency graph, and enabled-state settings on top of that foundation.
+
+## Requirements
+
+- A C++ 17 compiler.
+- CMake 3.16 or later.
+- Windows, Linux or macOS. MSVC, clang-cl, GCC and Clang are all built and tested.
+- An installed `stdcorelib` package.
+
+## Building
+
+Configure and build the library with CMake. Set `CMAKE_PREFIX_PATH` when CMake cannot find the `stdcorelib` installation automatically.
+
+```sh
+cmake -S . -B build -DCMAKE_PREFIX_PATH=/path/to/stdcorelib
+cmake --build build
+```
+
+The principal build options are:
+
+- `STDC_PLUGIN_BUILD_STATIC` builds a static library.
+- `STDC_PLUGIN_BUILD_SHARED` builds a shared library.
+- `STDC_PLUGIN_BUILD_TESTS` builds the test suite.
+- `STDC_PLUGIN_ENABLE_EXCEPTIONS` controls exception support.
+- `STDC_PLUGIN_INSTALL` generates installation rules.
+
+To build and run the tests:
+
+```sh
+cmake -S . -B build -DSTDC_PLUGIN_BUILD_TESTS=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+## Integration
+
+Install the library, make its installation prefix discoverable by CMake, and consume its exported target:
+
+```cmake
+find_package(stdcorelib-plugin CONFIG REQUIRED)
+
+target_link_libraries(myapp PRIVATE stdcorelib::plugin)
+```
+
+The package also makes `stdc_add_plugin_metadata()` available. A dynamic plugin normally uses a `MODULE` target:
+
+```cmake
+add_library(myplugin MODULE myplugin.cpp)
+target_link_libraries(myplugin PRIVATE stdcorelib::plugin)
+stdc_add_plugin_metadata(
+    TARGET myplugin
+    IID org.example.MyPlugin
+    METADATA myplugin.json
+)
+```
 
 ## Plugin Foundation
 
