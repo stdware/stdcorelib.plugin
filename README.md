@@ -16,29 +16,17 @@ Portable C++ Plugin Management Library.
 - Windows, Linux or macOS. MSVC, clang-cl, GCC and Clang are all built and tested.
 - An installed `stdcorelib` package.
 
-## Building
-
-Configure and build the library with CMake. Set `CMAKE_PREFIX_PATH` when CMake cannot find the `stdcorelib` installation automatically.
+## Build & Install
 
 ```sh
-cmake -S . -B build -DCMAKE_PREFIX_PATH=/path/to/stdcorelib
-cmake --build build
-```
-
-The principal build options are:
-
-- `STDC_PLUGIN_BUILD_STATIC` builds a static library.
-- `STDC_PLUGIN_BUILD_SHARED` builds a shared library.
-- `STDC_PLUGIN_BUILD_TESTS` builds the test suite.
-- `STDC_PLUGIN_ENABLE_EXCEPTIONS` controls exception support.
-- `STDC_PLUGIN_INSTALL` generates installation rules.
-
-To build and run the tests:
-
-```sh
-cmake -S . -B build -DSTDC_PLUGIN_BUILD_TESTS=ON
-cmake --build build
-ctest --test-dir build --output-on-failure
+git clone https://github.com/stdware/stdcorelib.plugin.git
+cd stdcorelib.plugin
+cmake -B build -S . \
+    -Dstdcorelib_DIR=/path/to/stdcorelib \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/path/to/install
+cmake --build build --config Release
+cmake --install build --config Release
 ```
 
 ## Integration
@@ -47,7 +35,6 @@ Install the library, make its installation prefix discoverable by CMake, and con
 
 ```cmake
 find_package(stdcorelib-plugin CONFIG REQUIRED)
-
 target_link_libraries(myapp PRIVATE stdcorelib::plugin)
 ```
 
