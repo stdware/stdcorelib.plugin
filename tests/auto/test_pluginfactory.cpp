@@ -292,4 +292,16 @@ BOOST_AUTO_TEST_CASE(test_ignores_runtime_plugin_without_iid) {
     BOOST_CHECK(factory.plugins("").empty());
 }
 
+BOOST_AUTO_TEST_CASE(test_ignores_paths_without_iid) {
+    const auto root = std::filesystem::path(TEST_PLUGINLOADER_METADATA_PATH).parent_path();
+    const std::vector<std::filesystem::path> paths{root};
+
+    stdc::plugin::PluginFactory factory;
+    factory.addPluginPath("", root);
+    factory.setPluginPaths("", paths);
+
+    BOOST_CHECK(factory.pluginPaths("").empty());
+    BOOST_CHECK(factory.plugins("").empty());
+}
+
 BOOST_AUTO_TEST_SUITE_END()

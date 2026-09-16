@@ -2,6 +2,7 @@
 
 #include "pluginsettings.h"
 
+#include <cassert>
 #include <utility>
 
 #include <stdcorelib/stlextra/algorithms.h>
@@ -9,6 +10,10 @@
 namespace stdc::pluginsystem {
 
     void PluginSettings::setPluginEnabled(std::string id, std::optional<bool> enabled) {
+        assert(!id.empty());
+        if (id.empty()) {
+            return;
+        }
         if (enabled) {
             _overrides[std::move(id)] = *enabled;
         } else if (auto it = _overrides.find(id); it != _overrides.end()) {

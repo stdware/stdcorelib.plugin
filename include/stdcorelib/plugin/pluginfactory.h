@@ -27,6 +27,8 @@ namespace stdc::plugin {
     /// Filesystem plugins are discovered lazily by IID. Static plugins and instances supplied by
     /// the program can be added explicitly.
     ///
+    /// Functions that receive an empty IID have no effect and return an empty result.
+    ///
     /// The interface is thread-safe.
     ///
     /// Replacing the search paths discards unloaded filesystem plugins. Loaded plugins, static

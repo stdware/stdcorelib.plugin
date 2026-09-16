@@ -196,6 +196,9 @@ namespace stdc::plugin {
     }
 
     void PluginFactory::addStaticPlugins(std::string_view iid) {
+        if (iid.empty()) {
+            return;
+        }
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
@@ -215,6 +218,9 @@ namespace stdc::plugin {
 
     void PluginFactory::addRuntimePlugin(std::string_view iid, Plugin *plugin,
                                          const json::Value &metadata) {
+        if (iid.empty()) {
+            return;
+        }
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
@@ -227,6 +233,9 @@ namespace stdc::plugin {
     }
 
     void PluginFactory::addPluginPath(std::string_view iid, const std::filesystem::path &path) {
+        if (iid.empty()) {
+            return;
+        }
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
         std::error_code ec;
@@ -243,6 +252,9 @@ namespace stdc::plugin {
 
     void PluginFactory::setPluginPaths(std::string_view iid,
                                        array_view<std::filesystem::path> paths) {
+        if (iid.empty()) {
+            return;
+        }
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
@@ -282,6 +294,9 @@ namespace stdc::plugin {
     }
 
     std::vector<std::filesystem::path> PluginFactory::pluginPaths(std::string_view iid) const {
+        if (iid.empty()) {
+            return {};
+        }
         stdc_impl_t;
         std::shared_lock<std::shared_mutex> lock(impl.plugins_mtx);
         auto it = impl.pluginPaths.find(iid);
@@ -292,6 +307,9 @@ namespace stdc::plugin {
     }
 
     std::vector<PluginLoader *> PluginFactory::plugins(std::string_view iid) const {
+        if (iid.empty()) {
+            return {};
+        }
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 

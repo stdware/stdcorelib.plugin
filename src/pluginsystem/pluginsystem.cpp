@@ -21,6 +21,7 @@ namespace stdc::pluginsystem {
 
     PluginSystem::Impl::Impl(std::string pluginIID, PluginLayout pluginLayout)
         : iid(std::move(pluginIID)), layout(pluginLayout == Bundle ? Bundle : Flat) {
+        assert(!iid.empty());
         assert(pluginLayout != CustomLayout);
         if (layout == Bundle) {
             factory = std::make_unique<plugin::BundlePluginFactory>();
@@ -32,6 +33,7 @@ namespace stdc::pluginsystem {
     PluginSystem::Impl::Impl(std::string pluginIID,
                              std::unique_ptr<plugin::PluginFactory> pluginFactory)
         : iid(std::move(pluginIID)), layout(CustomLayout), factory(std::move(pluginFactory)) {
+        assert(!iid.empty());
         assert(factory);
     }
 

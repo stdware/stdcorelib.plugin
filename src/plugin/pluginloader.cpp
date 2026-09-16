@@ -354,6 +354,9 @@ namespace stdc::plugin {
 
     std::vector<StaticPlugin> PluginLoader::staticPlugins(std::string_view iid) {
         std::vector<StaticPlugin> plugins;
+        if (iid.empty()) {
+            return plugins;
+        }
         for (const auto &entry : StaticPluginRegistry::entries()) {
             if (entry.name() == iid) {
                 plugins.push_back(entry.instantiate());
