@@ -729,10 +729,12 @@ BOOST_AUTO_TEST_CASE(test_duplicate_ids) {
 
     const auto specs = system.plugins();
     BOOST_REQUIRE_EQUAL(specs.size(), 2u);
-    for (const auto spec : specs) {
-        BOOST_CHECK_EQUAL(spec->state(), stdc::pluginsystem::PluginSpec::Invalid);
-        BOOST_CHECK(spec->errorMessage().find("duplicate") != std::string::npos);
-    }
+    BOOST_CHECK_EQUAL(specs[0]->displayName(), "First");
+    BOOST_CHECK_EQUAL(specs[0]->state(), stdc::pluginsystem::PluginSpec::Running);
+    BOOST_CHECK(!specs[0]->hasError());
+    BOOST_CHECK_EQUAL(specs[1]->displayName(), "Second");
+    BOOST_CHECK_EQUAL(specs[1]->state(), stdc::pluginsystem::PluginSpec::Invalid);
+    BOOST_CHECK(specs[1]->errorMessage().find("duplicate") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(test_duplicate_display_names_are_allowed) {

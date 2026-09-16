@@ -37,6 +37,7 @@ namespace stdc::plugin {
         PluginFactory();
         virtual ~PluginFactory();
 
+    protected:
         PluginFactory(PluginFactory &&RHS) noexcept;
         PluginFactory &operator=(PluginFactory &&RHS) noexcept;
 

@@ -12,12 +12,21 @@
 namespace stdc::plugin {
 
     PluginCatalog::Impl::Impl(std::string pluginIID, std::unique_ptr<PluginFactory> pluginFactory)
-        : iid(std::move(pluginIID)), factory(std::move(pluginFactory)) {
+        : iid(std::move(pluginIID)), factory(std::move(pluginFactory)), observer(iid) {
+        assert(factory);
+        factory->_impl->addObserver(&observer);
+    }
+
+    PluginCatalog::Impl::~Impl() {
+        factory->_impl->removeObserver(&observer);
     }
 
     void PluginCatalog::Impl::updateIndex(const PluginCatalog &catalog,
                                           PluginFactory::Impl &factoryImpl) const {
-        if (!indexed || !factoryImpl.isIndexed(iid)) {
+        if (factoryImpl.needsScan(iid)) {
+            factoryImpl.scanPlugins(*factory, iid);
+        }
+        if (observer.dirty) {
             rebuildIndex(catalog, factoryImpl);
         }
     }
@@ -28,13 +37,9 @@ namespace stdc::plugin {
         keys.clear();
         loadersByKey.clear();
 
-        if (!factoryImpl.isIndexed(iid)) {
-            factoryImpl.scanPlugins(*factory, iid);
-        }
-
         auto foundLoaders = factoryImpl.loaders.find(iid);
         if (foundLoaders == factoryImpl.loaders.end()) {
-            indexed = true;
+            observer.dirty = false;
             return;
         }
 
@@ -61,7 +66,7 @@ namespace stdc::plugin {
                 }
             }
         }
-        indexed = true;
+        observer.dirty = false;
     }
 
     PluginCatalog::PluginCatalog(std::string_view iid, std::unique_ptr<PluginFactory> factory)

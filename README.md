@@ -263,7 +263,7 @@ Static and runtime plugins differ only in how their instances enter the factory:
 
 `PluginSystem` is a metadata consumer and reserves these root fields:
 
-- `id` is required, identifies the plugin, and must be unique within the system.
+- `id` is required, identifies the plugin, and must be unique within the system. If discovery produces duplicate IDs, the first plugin is used and each later duplicate is invalid.
 - `displayName` is required display text and may repeat.
 - `version` is required and gives the current plugin version.
 - `compatVersion` is optional and defaults to `version`.

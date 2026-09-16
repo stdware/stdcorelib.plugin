@@ -19,7 +19,7 @@ namespace stdc::plugin {
     /// Owns a plugin factory and indexes one IID by metadata keys.
     ///
     /// The catalog keeps the factory alive and updates its key index after the factory changes.
-    /// The interface is thread-safe.
+    /// Query functions are thread-safe. \c loadPlugin() is not thread-safe.
     class STDC_PLUGIN_EXPORT PluginCatalog {
     public:
         /// \param iid The extension point to request from \a factory.
@@ -58,6 +58,7 @@ namespace stdc::plugin {
         /// \param args The remaining arguments forwarded to \c create().
         /// \return The created product, or null when lookup, loading, conversion, or creation
         ///         fails. Ownership follows the factory interface's contract.
+        /// \warning This function is not thread-safe.
         template <class PluginInterface, class FactoryInterface, class... Args>
         PluginInterface *loadPlugin(std::string_view key, Args &&...args) const {
             auto pluginLoader = loader(key);

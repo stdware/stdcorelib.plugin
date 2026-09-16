@@ -28,6 +28,9 @@ namespace stdc::pluginsystem {
     /// @{
 
     /// Discovers and manages plugins implementing the PluginSystem lifecycle.
+    ///
+    /// Plugin IDs must be unique within one system. If discovery produces duplicate IDs, the first
+    /// spec is used and each later duplicate is invalid.
     class STDC_PLUGIN_EXPORT PluginSystem {
     public:
         /// How filesystem plugins are arranged below each search path.

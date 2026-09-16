@@ -47,8 +47,15 @@ namespace stdc::plugin {
     bool PluginLoader::Impl::readLibrary(const std::filesystem::path &libraryPath,
                                          const std::optional<std::filesystem::path> &metadataPath) {
         reset();
-        filePath = fs::absolute(libraryPath);
-        if (!fs::is_regular_file(filePath)) {
+        std::error_code ec;
+        filePath = fs::absolute(libraryPath, ec);
+        if (ec) {
+            return reportError(formatN(R"(%1: %2)", libraryPath, ec.message()));
+        }
+        if (!fs::is_regular_file(filePath, ec)) {
+            if (ec) {
+                return reportError(formatN(R"(%1: %2)", filePath, ec.message()));
+            }
             return reportError(formatN(R"(%1: is not a regular file)", filePath));
         }
 
@@ -73,7 +80,10 @@ namespace stdc::plugin {
             return reportError(std::move(readError));
         }
         if (metadataPath) {
-            const auto sourcePath = fs::absolute(*metadataPath);
+            const auto sourcePath = fs::absolute(*metadataPath, ec);
+            if (ec) {
+                return reportError(formatN(R"(%1: %2)", *metadataPath, ec.message()));
+            }
             std::ifstream file(sourcePath);
             if (!file.is_open()) {
                 return reportError(formatN(R"(failed to open "%1")", sourcePath));
@@ -218,7 +228,6 @@ namespace stdc::plugin {
 
     bool PluginLoader::Impl::unloadLibrary() {
         if (state != PluginLoader::Loaded) {
-            clearError();
             return true;
         }
         if (origin != PluginLoader::FileSystem) {

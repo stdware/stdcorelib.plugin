@@ -65,6 +65,21 @@ BOOST_AUTO_TEST_CASE(test_failed_external_metadata_does_not_publish_embedded_dat
     BOOST_CHECK(loader.metadata().isNull());
 }
 
+BOOST_AUTO_TEST_CASE(test_unload_preserves_invalid_diagnostic) {
+    const auto missingPath =
+        std::filesystem::path(TEST_PLUGINLOADER_PLUGIN_PATH).parent_path() / "missing-plugin.dll";
+    stdc::plugin::PluginLoader loader(missingPath);
+
+    BOOST_REQUIRE_EQUAL(loader.state(), stdc::plugin::PluginLoader::Invalid);
+    BOOST_REQUIRE(loader.hasError());
+    const auto errorMessage = loader.errorMessage();
+
+    BOOST_CHECK(loader.unload());
+    BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Invalid);
+    BOOST_CHECK(loader.hasError());
+    BOOST_CHECK_EQUAL(loader.errorMessage(), errorMessage);
+}
+
 BOOST_AUTO_TEST_CASE(test_runtime_plugin) {
     RuntimePlugin plugin;
     const stdc::json::Value metadata = stdc::json::Object{
@@ -110,8 +125,20 @@ BOOST_AUTO_TEST_CASE(test_load_failed) {
     BOOST_REQUIRE_EQUAL(loader.state(), stdc::plugin::PluginLoader::Read);
     BOOST_CHECK(!loader.load());
     BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::LoadFailed);
-    BOOST_CHECK(loader.hasError());
+    BOOST_REQUIRE(loader.hasError());
+    const auto errorMessage = loader.errorMessage();
+
     BOOST_CHECK(loader.unload());
+    BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::LoadFailed);
+    BOOST_CHECK(loader.hasError());
+    BOOST_CHECK_EQUAL(loader.errorMessage(), errorMessage);
+
+    BOOST_CHECK(!loader.load());
+    BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::LoadFailed);
+    BOOST_CHECK_EQUAL(loader.errorMessage(), errorMessage);
+
+    loader.setFilePath(TEST_PLUGINLOADER_PLUGIN_PATH);
+    BOOST_CHECK_EQUAL(loader.state(), stdc::plugin::PluginLoader::Read);
     BOOST_CHECK(!loader.hasError());
 }
 

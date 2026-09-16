@@ -40,6 +40,28 @@ namespace stdc::plugin {
 
     PluginFactory::Impl::~Impl() = default;
 
+    void PluginFactory::Impl::addObserver(Observer *observer) const {
+        std::unique_lock<std::shared_mutex> lock(plugins_mtx);
+        assert(observer);
+        assert(std::find(observers.begin(), observers.end(), observer) == observers.end());
+        observers.push_back(observer);
+    }
+
+    void PluginFactory::Impl::removeObserver(Observer *observer) const {
+        std::unique_lock<std::shared_mutex> lock(plugins_mtx);
+        auto found = std::find(observers.begin(), observers.end(), observer);
+        assert(found != observers.end());
+        observers.erase(found);
+    }
+
+    void PluginFactory::Impl::notifyObservers(std::string_view iid) const {
+        for (auto observer : observers) {
+            if (observer->iid == iid) {
+                observer->dirty = true;
+            }
+        }
+    }
+
     std::unique_ptr<PluginLoader> PluginFactory::Impl::createLoader() {
         return std::make_unique<PluginLoader>();
     }
@@ -51,6 +73,7 @@ namespace stdc::plugin {
         }
 
         auto &known = found->second;
+        const auto previousSize = known.size();
         auto newEnd = std::remove_if(
             known.begin(), known.end(), [this](const std::unique_ptr<PluginLoader> &loader) {
                 if (loader->origin() != PluginLoader::FileSystem || loader->isLoaded()) {
@@ -60,6 +83,9 @@ namespace stdc::plugin {
                 return true;
             });
         known.erase(newEnd, known.end());
+        if (known.size() != previousSize) {
+            notifyObservers(iid);
+        }
         if (known.empty()) {
             loaders.erase(found);
         }
@@ -69,8 +95,8 @@ namespace stdc::plugin {
                                           std::string_view iid) const {
         auto it = pluginPaths.find(iid);
         if (it == pluginPaths.end()) {
-            if (auto dirty = pluginsDirty.find(iid); dirty != pluginsDirty.end()) {
-                pluginsDirty.erase(dirty);
+            if (auto pending = pendingScans.find(iid); pending != pendingScans.end()) {
+                pendingScans.erase(pending);
             }
             return;
         }
@@ -113,12 +139,13 @@ namespace stdc::plugin {
 
                 readPluginFiles.insert(std::move(pluginFile));
                 known.emplace_back(std::move(loader));
+                notifyObservers(iid);
             }
         }
 
         if (scanSucceeded) {
-            if (auto dirty = pluginsDirty.find(iid); dirty != pluginsDirty.end()) {
-                pluginsDirty.erase(dirty);
+            if (auto pending = pendingScans.find(iid); pending != pendingScans.end()) {
+                pendingScans.erase(pending);
             }
         }
     }
@@ -172,14 +199,18 @@ namespace stdc::plugin {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
+        bool added = false;
         for (const StaticPlugin &plugin : PluginLoader::staticPlugins(iid)) {
             auto loader = std::make_unique<PluginLoader>(plugin);
             if (loader->iid().empty()) {
                 continue;
             }
             impl.loaders[loader->iid()].emplace_back(std::move(loader));
+            added = true;
         }
-        impl.pluginsDirty.insert(std::string(iid));
+        if (added) {
+            impl.notifyObservers(iid);
+        }
     }
 
     void PluginFactory::addRuntimePlugin(std::string_view iid, Plugin *plugin,
@@ -192,17 +223,22 @@ namespace stdc::plugin {
             return;
         }
         impl.loaders[loader->iid()].emplace_back(std::move(loader));
-        impl.pluginsDirty.insert(std::string(iid));
+        impl.notifyObservers(iid);
     }
 
     void PluginFactory::addPluginPath(std::string_view iid, const std::filesystem::path &path) {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
-        if (!fs::is_directory(path)) {
+        std::error_code ec;
+        auto canonicalPath = fs::canonical(path, ec);
+        if (ec) {
             return;
         }
-        impl.pluginPaths[std::string(iid)].push_back(fs::canonical(path));
-        impl.pluginsDirty.insert(std::string(iid));
+        if (!fs::is_directory(canonicalPath, ec) || ec) {
+            return;
+        }
+        impl.pluginPaths[std::string(iid)].push_back(std::move(canonicalPath));
+        impl.pendingScans.insert(std::string(iid));
     }
 
     void PluginFactory::setPluginPaths(std::string_view iid,
@@ -213,10 +249,15 @@ namespace stdc::plugin {
         vlarray<std::filesystem::path> realPaths;
         realPaths.reserve(paths.size());
         for (const auto &path : paths) {
-            if (!fs::is_directory(path)) {
+            std::error_code ec;
+            auto canonicalPath = fs::canonical(path, ec);
+            if (ec) {
                 continue;
             }
-            realPaths.push_back(fs::canonical(path));
+            if (!fs::is_directory(canonicalPath, ec) || ec) {
+                continue;
+            }
+            realPaths.push_back(std::move(canonicalPath));
         }
 
         auto current = impl.pluginPaths.find(iid);
@@ -237,7 +278,7 @@ namespace stdc::plugin {
         } else {
             impl.pluginPaths[std::string(iid)] = std::move(realPaths);
         }
-        impl.pluginsDirty.insert(std::string(iid));
+        impl.pendingScans.insert(std::string(iid));
     }
 
     std::vector<std::filesystem::path> PluginFactory::pluginPaths(std::string_view iid) const {
@@ -254,7 +295,7 @@ namespace stdc::plugin {
         stdc_impl_t;
         std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
-        if (stdc::contains(impl.pluginsDirty, iid)) {
+        if (impl.needsScan(iid)) {
             impl.scanPlugins(*this, iid);
         }
 

@@ -71,22 +71,15 @@ namespace stdc::pluginsystem {
         resolvedDependencies.clear();
         loadOrder.clear();
 
-        // Two inline entries detect the only interesting duplicate-ID case without a separate
-        // buffer allocation.
-        std::map<std::string, vlarray<PluginSpecData *, 2>, std::less<>> dataById;
+        std::map<std::string, PluginSpecData *, std::less<>> dataById;
         for (auto &item : pluginData) {
             auto &data = item.second;
-            if (!data.id.empty()) {
-                dataById[data.id].push_back(&data);
-            }
-        }
-
-        for (const auto &[id, matchingData] : dataById) {
-            if (matchingData.size() < 2) {
+            if (data.id.empty()) {
                 continue;
             }
-            for (auto data : matchingData) {
-                data->reportError("duplicate plugin id \"" + id + "\"");
+            const auto [found, inserted] = dataById.try_emplace(data.id, &data);
+            if (!inserted) {
+                data.reportError("duplicate plugin id \"" + data.id + "\"");
             }
         }
 
@@ -99,8 +92,7 @@ namespace stdc::pluginsystem {
             auto &resolved = resolvedDependencies[&data];
             for (const auto &dependency : data.dependencies) {
                 auto it = dataById.find(dependency.id());
-                PluginSpecData *candidate =
-                    it != dataById.end() && it->second.size() == 1 ? it->second.front() : nullptr;
+                PluginSpecData *candidate = it != dataById.end() ? it->second : nullptr;
                 if (!candidate || candidate->state == PluginSpec::Invalid) {
                     if (dependency.type() == PluginDependency::Required) {
                         data.reportError("could not resolve required dependency \"" +

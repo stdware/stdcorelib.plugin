@@ -124,9 +124,10 @@ namespace stdc::plugin {
 
         /// Unloads a filesystem plugin, invalidating the pointer returned by \c plugin().
         ///
-        /// Returns true if the plugin is already unloaded. A loaded static or runtime plugin
-        /// cannot be unloaded because its lifetime is not controlled by this loader, so calling
-        /// this function on one returns false with the reason in \c errorMessage().
+        /// If no plugin instance is live, this returns true without changing the state or error. A
+        /// loaded static or runtime plugin cannot be unloaded because its lifetime is not
+        /// controlled by this loader, so calling this function on one returns false with the reason
+        /// in \c errorMessage().
         bool unload();
 
         inline bool isLoaded() const {

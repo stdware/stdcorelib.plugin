@@ -31,6 +31,7 @@ namespace {
     protected:
         bool scanPluginPaths(std::string_view iid, const std::filesystem::path &,
                              std::vector<std::filesystem::path> *pluginPaths) const override {
+            ++scanCount;
             scannedIid = iid;
             pluginPaths->push_back("candidate");
             return true;
@@ -46,6 +47,7 @@ namespace {
         }
 
     public:
+        mutable size_t scanCount = 0;
         mutable std::string scannedIid;
         mutable std::string resolvedIid;
     };
@@ -121,8 +123,8 @@ namespace {
 BOOST_AUTO_TEST_SUITE(test_pluginfactory)
 
 BOOST_AUTO_TEST_CASE(test_type_traits) {
-    static_assert(std::is_move_constructible_v<stdc::plugin::PluginFactory>);
-    static_assert(std::is_move_assignable_v<stdc::plugin::PluginFactory>);
+    static_assert(!std::is_move_constructible_v<stdc::plugin::PluginFactory>);
+    static_assert(!std::is_move_assignable_v<stdc::plugin::PluginFactory>);
     static_assert(!std::is_copy_constructible_v<stdc::plugin::PluginFactory>);
     static_assert(!std::is_copy_assignable_v<stdc::plugin::PluginFactory>);
     static_assert(std::is_move_constructible_v<stdc::plugin::BundlePluginFactory>);
@@ -159,6 +161,20 @@ BOOST_AUTO_TEST_CASE(test_retries_failed_scan) {
     BOOST_CHECK_EQUAL(factory.plugins("org.stdcorelib.LoaderTest").size(), 1u);
 }
 
+BOOST_AUTO_TEST_CASE(test_runtime_plugin_does_not_repeat_filesystem_scan) {
+    const auto root = std::filesystem::path(TEST_PLUGINLOADER_METADATA_PATH).parent_path();
+
+    RuntimePlugin runtimePlugin;
+    TestPluginFactory factory;
+    factory.addPluginPath("org.stdcorelib.LoaderTest", root);
+    BOOST_REQUIRE_EQUAL(factory.plugins("org.stdcorelib.LoaderTest").size(), 1u);
+    BOOST_CHECK_EQUAL(factory.scanCount, 1u);
+
+    factory.addRuntimePlugin("org.stdcorelib.LoaderTest", &runtimePlugin);
+    BOOST_CHECK_EQUAL(factory.plugins("org.stdcorelib.LoaderTest").size(), 2u);
+    BOOST_CHECK_EQUAL(factory.scanCount, 1u);
+}
+
 BOOST_AUTO_TEST_CASE(test_keeps_matching_plugin_with_invalid_external_metadata) {
     const auto root = std::filesystem::path(TEST_PLUGINLOADER_METADATA_PATH).parent_path();
 
@@ -188,6 +204,24 @@ BOOST_AUTO_TEST_CASE(test_replaces_paths) {
 
     factory.setPluginPaths("org.stdcorelib.LoaderTest", noPaths);
     BOOST_CHECK(factory.plugins("org.stdcorelib.LoaderTest").empty());
+}
+
+BOOST_AUTO_TEST_CASE(test_ignores_invalid_paths) {
+    const auto root = std::filesystem::path(TEST_PLUGINLOADER_METADATA_PATH).parent_path();
+    const auto missing = root / "missing-plugin-directory";
+    const std::vector<std::filesystem::path> paths{missing, root};
+
+    TestPluginFactory factory;
+    factory.addPluginPath("org.stdcorelib.LoaderTest", missing);
+    BOOST_CHECK(factory.pluginPaths("org.stdcorelib.LoaderTest").empty());
+
+    factory.setPluginPaths("org.stdcorelib.LoaderTest", paths);
+    const auto accepted = factory.pluginPaths("org.stdcorelib.LoaderTest");
+    BOOST_REQUIRE_EQUAL(accepted.size(), 1u);
+    std::error_code ec;
+    const auto canonicalRoot = std::filesystem::canonical(root, ec);
+    BOOST_REQUIRE(!ec);
+    BOOST_CHECK_EQUAL(accepted.front(), canonicalRoot);
 }
 
 BOOST_AUTO_TEST_CASE(test_keeps_loaded_plugin_when_replacing_paths) {

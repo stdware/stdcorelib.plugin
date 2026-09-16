@@ -16,6 +16,14 @@ namespace stdc::plugin {
 
     class PluginFactory::Impl {
     public:
+        struct Observer {
+            explicit Observer(std::string pluginIID) : iid(std::move(pluginIID)) {
+            }
+
+            std::string iid;
+            bool dirty = true;
+        };
+
         Impl();
         virtual ~Impl();
 
@@ -30,11 +38,19 @@ namespace stdc::plugin {
         /// already.
         void scanPlugins(const PluginFactory &factory, std::string_view iid) const;
 
-        /// Whether \a iid has been indexed since its configuration changed.
+        void addObserver(Observer *observer) const;
+        void removeObserver(Observer *observer) const;
+
+        /// Marks observers of \a iid for rebuilding after the loader set changes.
+        ///
+        /// The caller must hold \c plugins_mtx exclusively.
+        void notifyObservers(std::string_view iid) const;
+
+        /// Whether the search directories for \a iid must be scanned again.
         ///
         /// The caller must hold \c plugins_mtx.
-        bool isIndexed(std::string_view iid) const {
-            return !stdc::contains(pluginsDirty, iid);
+        bool needsScan(std::string_view iid) const {
+            return stdc::contains(pendingScans, iid);
         }
 
         std::map<std::string, vlarray<std::filesystem::path>, std::less<>> pluginPaths;
@@ -46,7 +62,8 @@ namespace stdc::plugin {
         /// Plugin files already turned into a loader, so that a rescan skips them.
         mutable std::set<std::filesystem::path::string_type> readPluginFiles;
 
-        mutable std::set<std::string, std::less<>> pluginsDirty;
+        mutable std::set<std::string, std::less<>> pendingScans;
+        mutable vlarray<Observer *, 1> observers;
         mutable std::shared_mutex plugins_mtx;
     };
 

@@ -17,6 +17,7 @@ namespace stdc::plugin {
     class PluginCatalog::Impl {
     public:
         Impl(std::string pluginIID, std::unique_ptr<PluginFactory> pluginFactory);
+        ~Impl();
 
         void updateIndex(const PluginCatalog &catalog, PluginFactory::Impl &factoryImpl) const;
         void rebuildIndex(const PluginCatalog &catalog, PluginFactory::Impl &factoryImpl) const;
@@ -26,7 +27,7 @@ namespace stdc::plugin {
             auto &factoryImpl = *factory->_impl;
             {
                 std::shared_lock<std::shared_mutex> lock(factoryImpl.plugins_mtx);
-                if (indexed && factoryImpl.isIndexed(iid)) {
+                if (!factoryImpl.needsScan(iid) && !observer.dirty) {
                     return read();
                 }
             }
@@ -38,7 +39,7 @@ namespace stdc::plugin {
 
         std::string iid;
         std::unique_ptr<PluginFactory> factory;
-        mutable bool indexed = false;
+        mutable PluginFactory::Impl::Observer observer;
         mutable std::vector<PluginLoader *> loaders;
         mutable std::vector<std::string> keys;
         /// Four factories for one key cover the common case without a heap allocation.

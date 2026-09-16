@@ -98,6 +98,9 @@ target_sources(${PROJECT_NAME} PRIVATE ${_src})
 target_compile_definitions(${PROJECT_NAME} PRIVATE STDC_PLUGIN_LIBRARY)
 
 if(STDC_PLUGIN_ENABLE_EXCEPTIONS)
+    # PUBLIC, and the only definition here that is: it tells whoever links this binary whether it
+    # can throw at them. Not the same question as STDC_HAS_EXCEPTIONS, which every translation
+    # unit works out about itself.
     target_compile_definitions(${PROJECT_NAME} PUBLIC STDC_PLUGIN_EXCEPTIONS=1)
 else()
     if(MSVC)

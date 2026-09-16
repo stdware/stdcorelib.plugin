@@ -148,9 +148,11 @@ BOOST_AUTO_TEST_CASE(test_default_key_index_and_factory_ownership) {
         BOOST_CHECK((!catalog.loadPlugin<Engine, EngineFactory>("missing", 42)));
 
         TestEngineFactory later;
-        catalog.factory()->addRuntimePlugin(
-            EngineIID, &later,
-            stdc::json::Object{{"keys", stdc::json::Array{"webp", "shared"}}});
+        catalog.factory()->addRuntimePlugin(EngineIID, &later,
+                                            stdc::json::Object{
+                                                {"keys", stdc::json::Array{"webp", "shared"}}
+        });
+        BOOST_CHECK_EQUAL(catalog.factory()->plugins(EngineIID).size(), 4u);
         BOOST_CHECK(catalog.loader("webp"));
         BOOST_CHECK_EQUAL(catalog.loaders().size(), 4u);
         BOOST_CHECK_EQUAL(catalog.loaders("shared").size(), 3u);
@@ -195,7 +197,9 @@ BOOST_AUTO_TEST_CASE(test_concurrent_queries_follow_factory_changes) {
         for (size_t i = 0; i < plugins.size(); ++i) {
             catalog.factory()->addRuntimePlugin(
                 EngineIID, &plugins[i],
-                stdc::json::Object{{"keys", stdc::json::Array{"engine-" + std::to_string(i)}}});
+                stdc::json::Object{
+                    {"keys", stdc::json::Array{"engine-" + std::to_string(i)}}
+            });
         }
     });
 
