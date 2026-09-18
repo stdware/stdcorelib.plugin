@@ -39,11 +39,18 @@ namespace stdc::plugin {
         PluginFactory();
         virtual ~PluginFactory();
 
-    protected:
+        /// Moves the factory state from \a RHS.
+        ///
+        /// The moved-from factory may only be destroyed or assigned a new value.
+        /// \warning Moving a factory owned by a \c PluginCatalog is undefined behavior.
         PluginFactory(PluginFactory &&RHS) noexcept;
+
+        /// Replaces this factory with the state moved from \a RHS.
+        ///
+        /// The moved-from factory may only be destroyed or assigned a new value.
+        /// \warning A factory owned by a \c PluginCatalog must not be either operand.
         PluginFactory &operator=(PluginFactory &&RHS) noexcept;
 
-    public:
         /// Adds the static plugins registered for \a iid.
         void addStaticPlugins(std::string_view iid);
 

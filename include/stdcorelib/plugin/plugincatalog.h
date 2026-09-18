@@ -36,6 +36,8 @@ namespace stdc::plugin {
         const std::string &iid() const;
 
         /// The factory owned by this catalog.
+        ///
+        /// \warning Do not delete or move the returned factory. Doing so is undefined behavior.
         PluginFactory *factory() const;
 
         /// A snapshot of all plugins accepted for this catalog, in factory order.

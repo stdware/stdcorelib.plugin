@@ -123,8 +123,8 @@ namespace {
 BOOST_AUTO_TEST_SUITE(test_pluginfactory)
 
 BOOST_AUTO_TEST_CASE(test_type_traits) {
-    static_assert(!std::is_move_constructible_v<stdc::plugin::PluginFactory>);
-    static_assert(!std::is_move_assignable_v<stdc::plugin::PluginFactory>);
+    static_assert(std::is_move_constructible_v<stdc::plugin::PluginFactory>);
+    static_assert(std::is_move_assignable_v<stdc::plugin::PluginFactory>);
     static_assert(!std::is_copy_constructible_v<stdc::plugin::PluginFactory>);
     static_assert(!std::is_copy_assignable_v<stdc::plugin::PluginFactory>);
     static_assert(std::is_move_constructible_v<stdc::plugin::BundlePluginFactory>);
