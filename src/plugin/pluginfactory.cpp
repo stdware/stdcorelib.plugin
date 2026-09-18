@@ -128,6 +128,11 @@ namespace stdc::plugin {
                     continue;
                 }
 
+                // Reading the library twice looks wasteful, but the second read is what keeps a
+                // bundle whose external metadata is broken visible. The loader only publishes the
+                // IID once the external metadata has parsed, so a single read with metadataPath
+                // would leave iid() empty and drop the plugin here instead of keeping it with the
+                // reason it is unusable.
                 auto loader = createLoader();
                 loader->setFilePath(canonical);
                 if (loader->iid() != iid) {
