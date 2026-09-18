@@ -69,12 +69,19 @@ namespace stdc::plugin {
         /// Adds a directory to search for \a iid.
         ///
         /// Each library carrying embedded plugin metadata is one plugin.
+        ///
+        /// \note A path that does not resolve to an existing directory is ignored, and nothing
+        ///       reports that. Check the path yourself if the distinction matters.
         void addPluginPath(std::string_view iid, const std::filesystem::path &path);
 
         /// Replaces the directories searched for \a iid.
         ///
         /// This invalidates pointers to unloaded filesystem plugins previously returned by
         /// \c plugins(). Loaded filesystem plugins and explicitly added plugins remain valid.
+        ///
+        /// \note Paths that do not resolve to an existing directory are ignored, so
+        ///       \c pluginPaths() can return fewer paths than were passed here. Whether the search
+        ///       paths changed at all is decided after that filtering.
         void setPluginPaths(std::string_view iid, array_view<std::filesystem::path> paths);
         std::vector<std::filesystem::path> pluginPaths(std::string_view iid) const;
 
