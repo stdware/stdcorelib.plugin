@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-#ifdef _WIN32
+#include <cstring>
+#include <string>
+#include <vector>
 
-#  include <cstring>
-#  include <string>
-#  include <vector>
+#include <stdcorelib/platform/windows/stdc_windows.h>
 
-#  include <stdcorelib/platform/windows/stdc_windows.h>
-
-#  include "pluginloader_fixture.h"
+#include "pluginloader_fixture.h"
 
 namespace {
 
@@ -176,5 +174,3 @@ BOOST_AUTO_TEST_CASE(test_metadata_section_holding_garbage) {
 }
 
 BOOST_AUTO_TEST_SUITE_END()
-
-#endif // _WIN32

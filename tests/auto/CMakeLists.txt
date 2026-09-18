@@ -11,6 +11,16 @@ if(NOT Boost_FOUND)
 endif()
 
 file(GLOB _src *.cpp)
+list(FILTER _src EXCLUDE REGEX "test_pluginloader_(win|linux|mac)\\.cpp$")
+
+if(WIN32)
+    list(APPEND _src test_pluginloader_win.cpp)
+elseif(APPLE)
+    list(APPEND _src test_pluginloader_mac.cpp)
+else()
+    list(APPEND _src test_pluginloader_linux.cpp)
+endif()
+
 add_executable(${PROJECT_NAME} ${_src})
 
 set(_plugin_dir ${CMAKE_CURRENT_SOURCE_DIR}/plugins/test_pluginloader_plugin)
