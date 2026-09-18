@@ -25,13 +25,13 @@ BOOST_AUTO_TEST_CASE(test_overrides) {
 
 BOOST_AUTO_TEST_CASE(test_json_round_trip_preserves_user_data_and_unknown_ids) {
     const stdc::json::Value value = stdc::json::Object{
-        {"disabledPlugins",
-         stdc::json::Array{"org.example.Absent", "org.example.Disabled"}},
-        {"enabledPlugins", stdc::json::Array{"org.example.Enabled"}},
-        {"userData", stdc::json::Object{
-                         {"theme", "dark"},
-                         {"window", stdc::json::Object{{"maximized", true}}},
-                     }},
+        {"disabledPlugins", stdc::json::Array{"org.example.Absent", "org.example.Disabled"}},
+        {"enabledPlugins",  stdc::json::Array{"org.example.Enabled"}                       },
+        {"userData",
+         stdc::json::Object{
+             {"theme", "dark"},
+             {"window", stdc::json::Object{{"maximized", true}}},
+         }                                                                                 },
     };
 
     std::string errorMessage = "not cleared";
