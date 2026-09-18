@@ -52,7 +52,7 @@ function(stdc_add_plugin_metadata)
     endif()
 
     get_target_property(_existing_iid ${_arg_TARGET} STDC_PLUGIN_IID)
-    if(NOT _existing_iid STREQUAL "_existing_iid-NOTFOUND")
+    if(_existing_iid)
         message(FATAL_ERROR
             "stdc_add_plugin_metadata: '${_arg_TARGET}' already has IID: ${_existing_iid}"
         )
