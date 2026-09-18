@@ -15,7 +15,20 @@ namespace fs = std::filesystem;
 
 namespace stdc::plugin {
 
+    static constexpr const char *metadataSegmentName = "__TEXT";
     static constexpr const char *metadataSectionName = "stdc_metadata";
+
+    /// Whether \a sectionHeader is the section named by STDC_PLUGIN_METADATA_SECTION.
+    ///
+    /// Both names are fixed size arrays that the linker does not necessarily terminate, so they
+    /// are compared bounded by their own size.
+    template <class T>
+    static bool is_metadata_section(const T &sectionHeader) {
+        return std::strncmp(sectionHeader.segname, metadataSegmentName,
+                            sizeof(sectionHeader.segname)) == 0 &&
+               std::strncmp(sectionHeader.sectname, metadataSectionName,
+                            sizeof(sectionHeader.sectname)) == 0;
+    }
 
     static bool valid_range(uint64_t offset, uint64_t size, uint64_t fileSize) {
         return offset <= fileSize && size <= fileSize - offset;
@@ -103,7 +116,7 @@ namespace stdc::plugin {
                     if (!read_object(file, sectionOffset, commandsEnd, &sectionHeader)) {
                         return false;
                     }
-                    if (std::strncmp(sectionHeader.sectname, metadataSectionName, 16) == 0) {
+                    if (is_metadata_section(sectionHeader)) {
                         if (sectionHeader.offset > std::numeric_limits<uint64_t>::max() - base) {
                             return false;
                         }
@@ -125,7 +138,7 @@ namespace stdc::plugin {
                     if (!read_object(file, sectionOffset, commandsEnd, &sectionHeader)) {
                         return false;
                     }
-                    if (std::strncmp(sectionHeader.sectname, metadataSectionName, 16) == 0) {
+                    if (is_metadata_section(sectionHeader)) {
                         if (sectionHeader.offset > std::numeric_limits<uint64_t>::max() - base) {
                             return false;
                         }
