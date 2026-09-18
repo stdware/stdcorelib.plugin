@@ -311,23 +311,33 @@ namespace stdc::plugin {
             return {};
         }
         stdc_impl_t;
-        std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
 
+        // Only a scan needs the exclusive lock, and a scan is rare compared to a query.
+        auto snapshot = [&impl, iid] {
+            std::vector<PluginLoader *> result;
+            auto it = impl.loaders.find(iid);
+            if (it == impl.loaders.end()) {
+                return result;
+            }
+            result.reserve(it->second.size());
+            for (const auto &loader : it->second) {
+                result.push_back(loader.get());
+            }
+            return result;
+        };
+
+        {
+            std::shared_lock<std::shared_mutex> lock(impl.plugins_mtx);
+            if (!impl.needsScan(iid)) {
+                return snapshot();
+            }
+        }
+
+        std::unique_lock<std::shared_mutex> lock(impl.plugins_mtx);
         if (impl.needsScan(iid)) {
             impl.scanPlugins(*this, iid);
         }
-
-        auto it = impl.loaders.find(iid);
-        if (it == impl.loaders.end()) {
-            return {};
-        }
-
-        std::vector<PluginLoader *> result;
-        result.reserve(it->second.size());
-        for (const auto &loader : it->second) {
-            result.push_back(loader.get());
-        }
-        return result;
+        return snapshot();
     }
 
     PluginFactory::PluginFactory(std::unique_ptr<Impl> impl) : _impl(std::move(impl)) {
