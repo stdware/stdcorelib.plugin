@@ -139,9 +139,17 @@ namespace stdc::plugin {
 
     public:
         /// Returns the IIDs that have static plugins registered for them.
+        ///
+        /// \warning This walks the static plugin registry, which is not synchronized. Loading or
+        ///          unloading a library that carries static plugin registrations concurrently
+        ///          with this call is undefined behavior. Serialize that yourself.
         static std::vector<std::string> staticPluginSets();
 
         /// Returns the static plugins registered for \a iid.
+        ///
+        /// \warning This walks the static plugin registry, which is not synchronized. Loading or
+        ///          unloading a library that carries static plugin registrations concurrently
+        ///          with this call is undefined behavior. Serialize that yourself.
         static std::vector<StaticPlugin> staticPlugins(std::string_view iid);
 
     protected:

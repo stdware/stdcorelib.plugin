@@ -29,7 +29,7 @@ namespace stdc::plugin {
     ///
     /// Functions that receive an empty IID have no effect and return an empty result.
     ///
-    /// The interface is thread-safe.
+    /// The interface is thread-safe, except where a function says otherwise.
     ///
     /// Replacing the search paths discards unloaded filesystem plugins. Loaded plugins, static
     /// plugins, and runtime plugins stay in the factory. Programs should set all plugin paths
@@ -52,6 +52,11 @@ namespace stdc::plugin {
         PluginFactory &operator=(PluginFactory &&RHS) noexcept;
 
         /// Adds the static plugins registered for \a iid.
+        ///
+        /// \warning This walks the static plugin registry, which the factory's lock does not
+        ///          protect. Loading or unloading a library that carries static plugin
+        ///          registrations concurrently with this call is undefined behavior. Serialize
+        ///          that yourself.
         void addStaticPlugins(std::string_view iid);
 
         /// Adds an instance the program already owns.
