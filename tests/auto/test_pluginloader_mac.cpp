@@ -97,9 +97,11 @@ BOOST_AUTO_TEST_CASE(test_command_area_past_end_of_file) {
     malformed::checkRejected(image.build(), noMetadata);
 }
 
-BOOST_AUTO_TEST_CASE(test_zero_command_size_does_not_advance) {
-    // A load command that claims no size would walk the reader in place forever if it were
-    // believed, so it has to be rejected outright.
+BOOST_AUTO_TEST_CASE(test_zero_command_size) {
+    // A load command that claims no size never advances the offset, so believing it would read
+    // the same command once per declared command. The loop is bounded by that count and cannot
+    // spin forever, but the image is refused either way. What refuses this one is the minimum
+    // size of a segment, not the minimum size of a load command.
     MachOImage image(malformed::envelope());
     image.segment.cmdsize = 0;
     malformed::checkRejected(image.build(), noMetadata);
