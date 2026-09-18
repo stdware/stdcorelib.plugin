@@ -30,6 +30,7 @@ namespace stdc::plugin {
         Header header{};
         file.seekg(0);
         file.read(reinterpret_cast<char *>(&header), sizeof(header));
+        // e_shnum == 0 is already covered by the check after it, and is kept for the reader.
         if (!file || header.e_ehsize != sizeof(Header) || header.e_shentsize != sizeof(Section) ||
             header.e_shnum == 0 || header.e_shstrndx >= header.e_shnum ||
             !valid_range(header.e_shoff, uint64_t(header.e_shnum) * sizeof(Section), fileSize)) {
