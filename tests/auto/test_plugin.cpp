@@ -35,7 +35,7 @@ STDC_EXPORT_STATIC_PLUGIN(InvalidStaticPlugin, "", (stdc::json::Object{}))
 
 STDC_EXPORT_STATIC_PLUGIN(InvalidMetadataStaticPlugin, "org.stdcorelib.InvalidMetadata", 42)
 
-BOOST_AUTO_TEST_SUITE(test_staticplugin)
+BOOST_AUTO_TEST_SUITE(test_plugin)
 
 BOOST_AUTO_TEST_CASE(test_registry) {
     const auto sets = stdc::plugin::PluginLoader::staticPluginSets();
