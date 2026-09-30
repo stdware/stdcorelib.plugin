@@ -71,7 +71,6 @@ namespace stdc::pluginsystem {
 
     void PluginSystem::Impl::resolveDependencies() {
         resolvedDependencies.clear();
-        loadOrder.clear();
 
         std::map<std::string, PluginSpecData *, std::less<>> dataById;
         for (auto &item : pluginData) {
@@ -209,6 +208,7 @@ namespace stdc::pluginsystem {
             }
         } while (changed);
 
+        PluginOrder order;
         std::set<PluginSpecData *> added;
         std::function<void(PluginSpecData *)> append = [&](PluginSpecData *data) {
             if (stdc::contains(added, data) || !data->enabled || !data->selectedForLoad ||
@@ -219,12 +219,16 @@ namespace stdc::pluginsystem {
                 append(dependency.data);
             }
             added.insert(data);
-            loadOrder.push_back(data);
+            order.push_back(data);
         };
         for (auto &item : pluginData) {
             auto &data = item.second;
             append(&data);
         }
+
+        // loadOrder() may run on other threads or from plugin code during loading.
+        std::unique_lock<std::shared_mutex> lock(configMtx);
+        loadOrder = std::move(order);
     }
 
     bool PluginSystem::Impl::requiredDependenciesAtState(PluginSpecData *data,
@@ -387,6 +391,17 @@ namespace stdc::pluginsystem {
 
         std::unique_lock<std::shared_mutex> writeLock(impl.configMtx);
         return impl.plugins(!impl.loadStarted);
+    }
+
+    std::vector<PluginSpec *> PluginSystem::loadOrder() const {
+        stdc_impl_t;
+        std::shared_lock<std::shared_mutex> lock(impl.configMtx);
+        std::vector<PluginSpec *> result;
+        result.reserve(impl.loadOrder.size());
+        for (auto data : impl.loadOrder) {
+            result.push_back(&data->spec);
+        }
+        return result;
     }
 
     void PluginSystem::loadPlugins() {

@@ -169,6 +169,7 @@ namespace {
         if (activePluginSystem) {
             activePluginSystem->plugins();
             activePluginSystem->hasError();
+            activePluginSystem->loadOrder();
         }
     }
 
@@ -600,6 +601,82 @@ BOOST_AUTO_TEST_CASE(test_lifecycle_dependency_order_and_reentrant_queries) {
     }
 }
 
+BOOST_AUTO_TEST_CASE(test_load_order_puts_dependencies_first) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
+    directory.addPlugin(
+        "a-top",
+        R"({"id":"Top","displayName":"Top","version":"1.0","dependencies":[{"id":"Middle","version":"1.0","type":"required"}]})");
+    directory.addPlugin(
+        "b-optional",
+        R"({"id":"Optional","displayName":"Optional","version":"1.0","dependencies":[{"id":"Late","version":"1.0","type":"optional"}]})");
+    directory.addPlugin(
+        "c-middle",
+        R"({"id":"Middle","displayName":"Middle","version":"1.0","dependencies":[{"id":"Base","version":"1.0","type":"required"}]})");
+    directory.addPlugin("d-base", R"({"id":"Base","displayName":"Base","version":"1.0"})");
+    directory.addPlugin("e-late", R"({"id":"Late","displayName":"Late","version":"1.0"})");
+    directory.addPlugin("f-alone", R"({"id":"Alone","displayName":"Alone","version":"1.0"})");
+
+    stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
+                                            stdc::pluginsystem::PluginSystem::Bundle);
+    system.setPluginPaths(directory.path());
+    BOOST_CHECK(system.loadOrder().empty());
+
+    bool emptyDuringSelection = true;
+    system.setPluginLoadPredicate([&](const stdc::pluginsystem::PluginSpec &) {
+        emptyDuringSelection = emptyDuringSelection && system.loadOrder().empty();
+        return true;
+    });
+    system.loadPlugins();
+    BOOST_CHECK(emptyDuringSelection);
+
+    const auto ids = [&system] {
+        std::vector<std::string> result;
+        for (const auto spec : system.loadOrder()) {
+            result.push_back(spec->id());
+        }
+        return result;
+    };
+    const std::vector<std::string> expected{"Base", "Middle", "Top", "Late", "Optional", "Alone"};
+    const auto loaded = ids();
+    BOOST_CHECK_EQUAL_COLLECTIONS(loaded.begin(), loaded.end(), expected.begin(), expected.end());
+    for (const auto spec : system.loadOrder()) {
+        BOOST_CHECK_EQUAL(spec, findPlugin(system.plugins(), spec->id()));
+    }
+
+    system.shutdownPlugins();
+    const auto stopped = ids();
+    BOOST_CHECK_EQUAL_COLLECTIONS(stopped.begin(), stopped.end(), expected.begin(), expected.end());
+}
+
+BOOST_AUTO_TEST_CASE(test_load_order_leaves_out_plugins_that_do_not_take_part) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
+    directory.addPlugin(
+        "broken",
+        R"({"id":"Broken","displayName":"Broken","version":"1.0","dependencies":[{"id":"Absent","version":"1.0","type":"required"}]})");
+    directory.addPlugin("disabled",
+                        R"({"id":"Disabled","displayName":"Disabled","version":"1.0"})");
+    directory.addPlugin("first", R"({"id":"Working","displayName":"First","version":"1.0"})");
+    directory.addPlugin("second", R"({"id":"Working","displayName":"Second","version":"1.0"})");
+    directory.addPlugin("unselected",
+                        R"({"id":"Unselected","displayName":"Unselected","version":"1.0"})");
+
+    stdc::pluginsystem::PluginSettings settings;
+    settings.setPluginEnabled("Disabled", false);
+
+    stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
+                                            stdc::pluginsystem::PluginSystem::Bundle);
+    system.setPluginPaths(directory.path());
+    system.setPluginSettings(stdc::pluginsystem::PluginSystem::Local, settings);
+    system.setPluginLoadPredicate(
+        [](const stdc::pluginsystem::PluginSpec &spec) { return spec.id() != "Unselected"; });
+    system.loadPlugins();
+
+    const auto order = system.loadOrder();
+    BOOST_REQUIRE_EQUAL(order.size(), 1u);
+    BOOST_CHECK_EQUAL(order.front()->displayName(), "First");
+    BOOST_CHECK_EQUAL(order.front()->state(), stdc::pluginsystem::PluginSpec::Running);
+}
+
 BOOST_AUTO_TEST_CASE(test_required_and_optional_dependencies) {
     TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
     directory.addPlugin(
@@ -696,6 +773,10 @@ BOOST_AUTO_TEST_CASE(test_initialization_failure_is_isolated_and_propagates) {
     BOOST_CHECK_EQUAL(consumer->state(), stdc::pluginsystem::PluginSpec::Loaded);
     BOOST_CHECK(consumer->hasError());
     BOOST_CHECK_EQUAL(working->state(), stdc::pluginsystem::PluginSpec::Running);
+
+    const auto order = system.loadOrder();
+    const std::vector<stdc::pluginsystem::PluginSpec *> expected{provider, consumer, working};
+    BOOST_CHECK_EQUAL_COLLECTIONS(order.begin(), order.end(), expected.begin(), expected.end());
 }
 
 BOOST_AUTO_TEST_CASE(test_incompatible_dependency) {
@@ -793,6 +874,10 @@ BOOST_AUTO_TEST_CASE(test_loaded_plugin_must_implement_iplugin) {
     BOOST_REQUIRE(spec);
     BOOST_CHECK(spec->hasError());
     BOOST_CHECK(spec->errorMessage().find("IPlugin") != std::string::npos);
+
+    const auto order = system.loadOrder();
+    BOOST_REQUIRE_EQUAL(order.size(), 1u);
+    BOOST_CHECK_EQUAL(order.front(), spec);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

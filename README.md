@@ -432,7 +432,7 @@ int runApplication(const std::filesystem::path &applicationDir,
 
 The lifecycle has the following ordering and ownership rules:
 
-- Loading and initialization follow dependency order.
+- Loading and initialization follow dependency order. `loadOrder()` returns that order after loading, with only the plugins that took part.
 - `pluginsInitialized()` and `aboutToShutdown()` run in reverse dependency order.
 - Shutdown unloads libraries in reverse dependency order.
 - After a spec reaches a loaded lifecycle state, `PluginSpec::plugin()` returns its non-owning `IPlugin` pointer. Hosts can cast it to the IID-specific application interface.

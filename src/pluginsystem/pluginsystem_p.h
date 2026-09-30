@@ -51,6 +51,7 @@ namespace stdc::pluginsystem {
         bool shutdownFinished = false;
 
         std::map<PluginSpecData *, ResolvedDependencies> resolvedDependencies;
+        /// Written once under configMtx. The lifecycle thread reads it without the lock.
         PluginOrder loadOrder;
 
         void resolveDependencies();

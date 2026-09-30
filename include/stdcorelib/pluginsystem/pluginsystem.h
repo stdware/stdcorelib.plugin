@@ -114,6 +114,19 @@ namespace stdc::pluginsystem {
         /// earlier calls.
         std::vector<PluginSpec *> plugins() const;
 
+        /// Returns the plugins that take part in loading, in the order loadPlugins() loads them.
+        ///
+        /// - Each plugin comes after its resolved dependencies, required or optional. Otherwise the
+        ///   order follows plugins().
+        /// - Plugins that are disabled, not selected by the load predicate, or invalid before
+        ///   loading are left out.
+        /// - Plugins that fail to load or initialize stay in the list with their errors.
+        /// - shutdownPlugins() runs in the reverse order and leaves the list unchanged.
+        ///
+        /// The list is empty until loadPlugins() resolves dependencies, which happens after it
+        /// calls the load predicate.
+        std::vector<PluginSpec *> loadOrder() const;
+
         /// Loads and initializes every enabled, valid plugin once.
         ///
         /// Dependencies are loaded and initialized before their dependents. Errors remain on each
