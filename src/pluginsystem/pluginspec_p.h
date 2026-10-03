@@ -22,6 +22,7 @@ namespace stdc::pluginsystem {
         std::string errorMessage;
         std::string id;
         std::string displayName;
+        std::string description;
         VersionNumber version;
         VersionNumber compatVersion;
         std::vector<PluginDependency> dependencies;

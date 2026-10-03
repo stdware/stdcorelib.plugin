@@ -60,6 +60,9 @@ namespace stdc::pluginsystem {
         /// The display name, which does not have to be unique.
         const std::string &displayName() const;
 
+        /// A human-readable description of this plugin, or empty when none was provided.
+        const std::string &description() const;
+
         /// The plugin version.
         const VersionNumber &version() const;
 

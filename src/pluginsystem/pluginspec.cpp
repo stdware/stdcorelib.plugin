@@ -38,6 +38,14 @@ namespace stdc::pluginsystem {
             return reportError("missing or invalid plugin display name");
         }
 
+        const auto &descriptionValue = metadata["description"];
+        if (!descriptionValue.isNull()) {
+            if (!descriptionValue.isString()) {
+                return reportError("invalid plugin description");
+            }
+            description = descriptionValue.toString();
+        }
+
         std::string versionString;
         if (!readString("version", &versionString)) {
             return reportError("missing or invalid plugin version");
@@ -148,6 +156,10 @@ namespace stdc::pluginsystem {
 
     const std::string &PluginSpec::displayName() const {
         return _data->displayName;
+    }
+
+    const std::string &PluginSpec::description() const {
+        return _data->description;
     }
 
     const VersionNumber &PluginSpec::version() const {

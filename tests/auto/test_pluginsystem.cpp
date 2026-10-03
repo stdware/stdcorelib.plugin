@@ -34,7 +34,7 @@ namespace {
             } else {
                 addPlugin(
                     "plugin",
-                    R"({"id":"org.stdcorelib.PluginSystemTest","displayName":"PluginSystem Test","version":"2.1.0"})");
+                    R"({"id":"org.stdcorelib.PluginSystemTest","displayName":"PluginSystem Test","description":"A plugin system test plugin.","version":"2.1.0"})");
             }
         }
 
@@ -197,6 +197,7 @@ namespace {
         BOOST_CHECK(!specs.front()->hasError());
         BOOST_CHECK_EQUAL(specs.front()->id(), "org.stdcorelib.PluginSystemTest");
         BOOST_CHECK_EQUAL(specs.front()->displayName(), "PluginSystem Test");
+        BOOST_CHECK_EQUAL(specs.front()->description(), "A plugin system test plugin.");
         BOOST_CHECK_EQUAL(specs.front()->version(), stdc::VersionNumber(2, 1));
         BOOST_CHECK_EQUAL(specs.front()->compatVersion(), specs.front()->version());
 

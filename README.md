@@ -265,6 +265,7 @@ Static and runtime plugins differ only in how their instances enter the factory:
 
 - `id` is required, identifies the plugin, and must be unique within the system. If discovery produces duplicate IDs, the first plugin is used and each later duplicate is invalid.
 - `displayName` is required display text and may repeat.
+- `description` is optional human-readable text for the plugin.
 - `version` is required and gives the current plugin version.
 - `compatVersion` is optional and defaults to `version`.
 - `enabledByDefault` is optional and defaults to `true`.
@@ -278,6 +279,7 @@ The metadata has the following schema:
 {
     "id": "org.example.editor",
     "displayName": "Editor",
+    "description": "Provides the editor extension.",
     "version": "2.1.0",
     "compatVersion": "2.0.0",
     "enabledByDefault": true,

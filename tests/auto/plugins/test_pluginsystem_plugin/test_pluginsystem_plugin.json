@@ -1,5 +1,6 @@
 {
     "id": "org.stdcorelib.PluginSystemTest",
     "displayName": "PluginSystem Test",
+    "description": "A plugin system test plugin.",
     "version": "2.1.0"
 }
