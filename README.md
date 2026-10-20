@@ -436,6 +436,7 @@ The lifecycle has the following ordering and ownership rules:
 
 - Loading and initialization follow dependency order. `loadOrder()` returns that order after loading, with only the plugins that took part.
 - `pluginsInitialized()` and `aboutToShutdown()` run in reverse dependency order.
+- `PluginSystem::remoteCommand()` passes the arguments of another process of the application, such as the files of a second start, to `IPlugin::remoteCommand()` of every running plugin in load order. A command passed before `loadPlugins()` finishes is kept until every plugin is running. A command passed after shutdown starts has no effect.
 - Shutdown unloads libraries in reverse dependency order.
 - After a spec reaches a loaded lifecycle state, `PluginSpec::plugin()` returns its non-owning `IPlugin` pointer. Hosts can cast it to the IID-specific application interface.
 - Successful shutdown clears the plugin pointer when the library is unloaded.

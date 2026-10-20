@@ -12,4 +12,7 @@ namespace stdc::pluginsystem {
     void IPlugin::aboutToShutdown() {
     }
 
+    void IPlugin::remoteCommand(const std::vector<std::string> &, const std::filesystem::path &) {
+    }
+
 }

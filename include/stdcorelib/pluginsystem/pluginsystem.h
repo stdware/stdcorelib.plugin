@@ -133,6 +133,17 @@ namespace stdc::pluginsystem {
         /// PluginSpec.
         void loadPlugins();
 
+        /// Passes the arguments of another process of the application to IPlugin::remoteCommand()
+        /// of every running plugin, in load order.
+        ///
+        /// - A command passed before loadPlugins() finishes is kept, and passed in the order of
+        ///   the commands once every plugin is initialized. This includes a command passed during
+        ///   loadPlugins() from an event loop that a plugin runs.
+        /// - A command passed after shutdownPlugins() starts has no effect.
+        /// - The caller is the thread that calls loadPlugins().
+        void remoteCommand(const std::vector<std::string> &arguments,
+                           const std::filesystem::path &workingDirectory);
+
         /// Shuts down and unloads plugins in reverse dependency order.
         ///
         /// Repeated calls and calls before loadPlugins() have no effect. The destructor calls this

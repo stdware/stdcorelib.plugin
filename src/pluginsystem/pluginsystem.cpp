@@ -285,6 +285,17 @@ namespace stdc::pluginsystem {
         return result;
     }
 
+    void PluginSystem::Impl::dispatchRemoteCommand(const RemoteCommand &command) {
+        for (auto data : loadOrder) {
+            if (shutdownFinished) {
+                return;
+            }
+            if (data->state == PluginSpec::Running) {
+                data->plugin->remoteCommand(command.arguments, command.workingDirectory);
+            }
+        }
+    }
+
     void PluginSystem::Impl::shutdownPlugins() {
         std::lock_guard<std::mutex> lifecycleLock(lifecycleMtx);
         if (!loadStarted || shutdownFinished) {
@@ -406,7 +417,7 @@ namespace stdc::pluginsystem {
 
     void PluginSystem::loadPlugins() {
         stdc_impl_t;
-        std::lock_guard<std::mutex> lifecycleLock(impl.lifecycleMtx);
+        std::unique_lock<std::mutex> lifecycleLock(impl.lifecycleMtx);
         {
             std::unique_lock<std::shared_mutex> lock(impl.configMtx);
             if (impl.loadStarted) {
@@ -464,6 +475,32 @@ namespace stdc::pluginsystem {
             data->plugin->pluginsInitialized();
             data->state = PluginSpec::Running;
         }
+
+        // The kept commands are passed without the lifecycle lock, so that a plugin may shut
+        // down the system while it handles a command. A command passed meanwhile is kept behind
+        // them, because loadFinished is set only after the last of them.
+        lifecycleLock.unlock();
+        while (!impl.pendingRemoteCommands.empty()) {
+            const auto command = std::move(impl.pendingRemoteCommands.front());
+            impl.pendingRemoteCommands.erase(impl.pendingRemoteCommands.begin());
+            impl.dispatchRemoteCommand(command);
+        }
+        impl.loadFinished = true;
+    }
+
+    void PluginSystem::remoteCommand(const std::vector<std::string> &arguments,
+                                     const std::filesystem::path &workingDirectory) {
+        stdc_impl_t;
+        // No lock, because a plugin may run an event loop that delivers the command during
+        // loadPlugins(), which holds the lifecycle lock on the same thread.
+        if (impl.shutdownFinished) {
+            return;
+        }
+        if (!impl.loadFinished) {
+            impl.pendingRemoteCommands.push_back({arguments, workingDirectory});
+            return;
+        }
+        impl.dispatchRemoteCommand({arguments, workingDirectory});
     }
 
     void PluginSystem::shutdownPlugins() {

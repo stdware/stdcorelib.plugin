@@ -27,6 +27,17 @@ namespace {
             notify("aboutToShutdown");
         }
 
+        // Records the arguments separated by spaces and the working directory after a colon
+        void remoteCommand(const std::vector<std::string> &arguments,
+                           const std::filesystem::path &workingDirectory) override {
+            std::string event = "remoteCommand";
+            for (const auto &argument : arguments) {
+                event += " " + argument;
+            }
+            event += ":" + workingDirectory.generic_string();
+            notify(event.c_str());
+        }
+
     private:
         static void notify(const char *event) {
             if (eventCallback) {

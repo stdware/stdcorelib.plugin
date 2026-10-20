@@ -50,6 +50,17 @@ namespace stdc::pluginsystem {
         bool loadStarted = false;
         bool shutdownFinished = false;
 
+        struct RemoteCommand {
+            std::vector<std::string> arguments;
+            std::filesystem::path workingDirectory;
+        };
+        /// Set when loadPlugins() has initialized every plugin and passed the kept commands. Read
+        /// and written on the lifecycle thread only.
+        bool loadFinished = false;
+        /// The commands passed before loadPlugins() finished, in their order
+        std::vector<RemoteCommand> pendingRemoteCommands;
+        void dispatchRemoteCommand(const RemoteCommand &command);
+
         std::map<PluginSpecData *, ResolvedDependencies> resolvedDependencies;
         /// Written once under configMtx. The lifecycle thread reads it without the lock.
         PluginOrder loadOrder;

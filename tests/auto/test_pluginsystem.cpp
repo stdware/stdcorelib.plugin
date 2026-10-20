@@ -9,6 +9,7 @@
 #include <atomic>
 #include <chrono>
 #include <fstream>
+#include <functional>
 #include <thread>
 
 #include <boost/test/unit_test.hpp>
@@ -163,9 +164,14 @@ namespace {
 
     std::vector<std::string> lifecycleEvents;
     stdc::pluginsystem::PluginSystem *activePluginSystem = nullptr;
+    // Called with each recorded event, so that a test may act during the lifecycle
+    std::function<void(const std::string &)> lifecycleHook;
 
     void recordLifecycleEvent(const char *plugin, const char *event) {
         lifecycleEvents.push_back(std::string(plugin) + "." + event);
+        if (lifecycleHook) {
+            lifecycleHook(lifecycleEvents.back());
+        }
         if (activePluginSystem) {
             activePluginSystem->plugins();
             activePluginSystem->hasError();
@@ -600,6 +606,58 @@ BOOST_AUTO_TEST_CASE(test_lifecycle_dependency_order_and_reentrant_queries) {
     for (auto spec : system.plugins()) {
         BOOST_CHECK_EQUAL(spec->state(), stdc::pluginsystem::PluginSpec::Stopped);
     }
+}
+
+BOOST_AUTO_TEST_CASE(test_remote_commands_reach_running_plugins_in_load_order) {
+    TemporaryPluginSystemDirectory directory(stdc::pluginsystem::PluginSystem::Bundle, false);
+    const auto providerPath = directory.addPlugin(
+        "provider", R"({"id":"Provider","displayName":"Provider","version":"1.0"})",
+        TEST_PLUGINSYSTEM_LIFECYCLE_PROVIDER_PATH);
+    const auto consumerPath = directory.addPlugin(
+        "consumer",
+        R"({"id":"Consumer","displayName":"Consumer","version":"1.0","dependencies":[{"id":"Provider","version":"1.0","type":"required"}]})",
+        TEST_PLUGINSYSTEM_LIFECYCLE_CONSUMER_PATH);
+
+    stdc::SharedLibrary providerLibrary;
+    stdc::SharedLibrary consumerLibrary;
+    setLifecycleCallback(&providerLibrary, providerPath);
+    setLifecycleCallback(&consumerLibrary, consumerPath);
+
+    stdc::pluginsystem::PluginSystem system("org.stdcorelib.PluginSystem",
+                                            stdc::pluginsystem::PluginSystem::Bundle);
+    system.setPluginPaths(directory.path());
+    lifecycleEvents.clear();
+
+    // A command before loading and a command during the initialization are kept until every
+    // plugin is running, in their order.
+    system.remoteCommand({"before"}, "/a");
+    lifecycleHook = [&system](const std::string &event) {
+        if (event == "consumer.initialize") {
+            system.remoteCommand({"during", "x"}, "/b");
+        }
+    };
+    system.loadPlugins();
+    lifecycleHook = nullptr;
+    system.remoteCommand({"after"}, "/c");
+    system.shutdownPlugins();
+    system.remoteCommand({"shutdown"}, "/d");
+
+    const std::vector<std::string> expected{
+        "provider.initialize",
+        "consumer.initialize",
+        "consumer.pluginsInitialized",
+        "provider.pluginsInitialized",
+        "provider.remoteCommand before:/a",
+        "consumer.remoteCommand before:/a",
+        "provider.remoteCommand during x:/b",
+        "consumer.remoteCommand during x:/b",
+        "provider.remoteCommand after:/c",
+        "consumer.remoteCommand after:/c",
+        "consumer.aboutToShutdown",
+        "provider.aboutToShutdown",
+    };
+    BOOST_CHECK_EQUAL_COLLECTIONS(lifecycleEvents.begin(), lifecycleEvents.end(), expected.begin(),
+                                  expected.end());
 }
 
 BOOST_AUTO_TEST_CASE(test_load_order_puts_dependencies_first) {
