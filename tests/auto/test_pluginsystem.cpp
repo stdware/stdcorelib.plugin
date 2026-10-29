@@ -10,11 +10,22 @@
 #include <chrono>
 #include <fstream>
 #include <functional>
+#include <string>
 #include <thread>
 
 #include <boost/test/unit_test.hpp>
 
 namespace {
+
+    // Returns the bundle name of a plugin library, which excludes the debug postfix of MSVC that
+    // BundlePluginFactory appends.
+    std::string bundleName(const std::filesystem::path &library) {
+        auto name = library.stem().string();
+#if defined(_MSC_VER) && defined(_DEBUG)
+        name.pop_back();
+#endif
+        return name;
+    }
 
     class TemporaryPluginSystemDirectory {
     public:
@@ -54,7 +65,7 @@ namespace {
             std::filesystem::copy_file(source, pluginPath);
 
             std::ofstream metadataFile(pluginDirectory / "plugin.json");
-            metadataFile << R"({"name":")" << source.stem().string() << '"';
+            metadataFile << R"({"name":")" << bundleName(source) << '"';
             if (metadata.size() > 2) {
                 metadataFile << ',' << metadata.substr(1, metadata.size() - 2);
             }

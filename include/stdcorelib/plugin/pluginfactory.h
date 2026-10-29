@@ -139,7 +139,8 @@ namespace stdc::plugin {
     ///
     /// Each bundle has external metadata and a plugin library. The metadata's root \c name
     /// field gives the library's platform-independent name. For example, \c editor can resolve to
-    /// \c editor.dll, \c libeditor.so, or \c libeditor.dylib.
+    /// \c editor.dll, \c libeditor.so, or \c libeditor.dylib. A debug build of MSVC tries the
+    /// name with the debug postfix \c d first, such as \c editord.dll, and then the name alone.
     class STDC_PLUGIN_EXPORT BundlePluginFactory : public PluginFactory {
     public:
         /// Creates a bundle factory with a configurable metadata path.
@@ -166,7 +167,8 @@ namespace stdc::plugin {
         /// Resolves the plugin library described by bundle metadata.
         ///
         /// The default implementation reads the root \c name field, searches the bundle root, and
-        /// accepts the platform's library prefix and suffix around that name.
+        /// accepts the platform's library prefix and suffix around that name. A debug build of
+        /// MSVC tries the name with the debug postfix \c d before the name alone.
         ///
         /// \param bundlePath The bundle directory returned by scanPluginPaths().
         /// \param metadata The complete root object read from the bundle metadata file.

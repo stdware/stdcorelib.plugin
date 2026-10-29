@@ -11,6 +11,16 @@
 
 namespace {
 
+    // Returns the bundle name of a plugin library, which excludes the debug postfix of MSVC that
+    // BundlePluginFactory appends.
+    std::string bundleName(const std::filesystem::path &library) {
+        auto name = library.stem().string();
+#if defined(_MSC_VER) && defined(_DEBUG)
+        name.pop_back();
+#endif
+        return name;
+    }
+
     class RuntimePlugin : public stdc::plugin::Plugin {};
 
     class DefaultPluginFactoryProbe : public stdc::plugin::PluginFactory {
@@ -101,12 +111,18 @@ namespace {
 
         std::filesystem::path addBundle() const {
             const auto source = std::filesystem::path(TEST_PLUGINLOADER_PLUGIN_PATH);
+            return addBundle(source.filename());
+        }
+
+        // Adds a bundle whose library is the test plugin copied to fileName.
+        std::filesystem::path addBundle(const std::filesystem::path &fileName) const {
+            const auto source = std::filesystem::path(TEST_PLUGINLOADER_PLUGIN_PATH);
             const auto bundle = _path / "bundle";
             std::filesystem::create_directory(bundle);
-            std::filesystem::copy_file(source, bundle / source.filename());
+            std::filesystem::copy_file(source, bundle / fileName);
 
             std::ofstream metadata(bundle / "plugin.json");
-            metadata << R"({"name":")" << source.stem().string() << R"(","answer":42})";
+            metadata << R"({"name":")" << bundleName(source) << R"(","answer":42})";
             return bundle;
         }
 
@@ -283,6 +299,45 @@ BOOST_AUTO_TEST_CASE(test_bundle_scan_and_resolve) {
     BOOST_CHECK_EQUAL(plugins.front()->iid(), "org.stdcorelib.LoaderTest");
     BOOST_CHECK_EQUAL(plugins.front()->metadata()["answer"].toInt(), 42);
 }
+
+#ifdef _MSC_VER
+BOOST_AUTO_TEST_CASE(test_bundle_debug_postfix) {
+    const auto source = std::filesystem::path(TEST_PLUGINLOADER_PLUGIN_PATH);
+    const auto name = bundleName(source);
+    const auto extension = source.extension().string();
+
+#  ifdef _DEBUG
+    // The name alone resolves if the library has no postfix.
+    {
+        TemporaryPluginDirectory directory;
+        directory.addBundle(name + extension);
+
+        stdc::plugin::BundlePluginFactory factory;
+        factory.addPluginPath("org.stdcorelib.LoaderTest", directory.path());
+        BOOST_CHECK_EQUAL(factory.plugins("org.stdcorelib.LoaderTest").size(), 1u);
+    }
+
+    // The postfix precedes the name alone, which is a library without plugin metadata here.
+    {
+        TemporaryPluginDirectory directory;
+        const auto bundle = directory.addBundle(name + "d" + extension);
+        std::filesystem::copy_file(TEST_PLUGINLOADER_LIBRARY_PATH, bundle / (name + extension));
+
+        stdc::plugin::BundlePluginFactory factory;
+        factory.addPluginPath("org.stdcorelib.LoaderTest", directory.path());
+        BOOST_CHECK_EQUAL(factory.plugins("org.stdcorelib.LoaderTest").size(), 1u);
+    }
+#  else
+    // A release build does not resolve a debug library.
+    TemporaryPluginDirectory directory;
+    directory.addBundle(name + "d" + extension);
+
+    stdc::plugin::BundlePluginFactory factory;
+    factory.addPluginPath("org.stdcorelib.LoaderTest", directory.path());
+    BOOST_CHECK(factory.plugins("org.stdcorelib.LoaderTest").empty());
+#  endif
+}
+#endif
 
 BOOST_AUTO_TEST_CASE(test_ignores_runtime_plugin_without_iid) {
     RuntimePlugin plugin;

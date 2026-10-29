@@ -450,16 +450,27 @@ namespace stdc::plugin {
             ".so",
 #endif
         };
+        // Debug and release builds of MSVC use incompatible C runtimes and STL layouts. A debug
+        // build tries the postfix d first and then the plain name, because some plugins omit the
+        // postfix. A release build does not try the postfix.
+#if defined(_MSC_VER) && defined(_DEBUG)
+        constexpr std::array<std::string_view, 2> postfixes{"d", ""};
+#else
+        constexpr std::array<std::string_view, 1> postfixes{""};
+#endif
 
-        for (const auto prefix : prefixes) {
-            for (const auto suffix : suffixes) {
-                fs::path candidateName = std::string(prefix);
-                candidateName += requestedPath.native();
-                candidateName += std::string(suffix);
-                const auto candidate = bundlePath / candidateName;
-                std::error_code ec;
-                if (fs::is_regular_file(candidate, ec) && SharedLibrary::isLibrary(candidate)) {
-                    return candidate;
+        for (const auto postfix : postfixes) {
+            for (const auto prefix : prefixes) {
+                for (const auto suffix : suffixes) {
+                    fs::path candidateName = std::string(prefix);
+                    candidateName += requestedPath.native();
+                    candidateName += std::string(postfix);
+                    candidateName += std::string(suffix);
+                    const auto candidate = bundlePath / candidateName;
+                    std::error_code ec;
+                    if (fs::is_regular_file(candidate, ec) && SharedLibrary::isLibrary(candidate)) {
+                        return candidate;
+                    }
                 }
             }
         }

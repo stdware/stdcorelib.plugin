@@ -307,7 +307,7 @@ A plugin with compatibility version `C` and current version `V` satisfies a requ
 `PluginSystem` supports three filesystem layouts:
 
 - `Flat` is the default. It puts plugin libraries directly below each search path and reads their embedded metadata.
-- `Bundle` gives every plugin a child directory containing its library and a sidecar `plugin.json`. The metadata must contain a root `name` without a platform library prefix or suffix. For example, `"name": "editor"` can resolve to `editor.dll`, `libeditor.dll`, `libeditor.so`, or `libeditor.dylib`.
+- `Bundle` gives every plugin a child directory containing its library and a sidecar `plugin.json`. The metadata must contain a root `name` without a platform library prefix or suffix. For example, `"name": "editor"` can resolve to `editor.dll`, `libeditor.dll`, `libeditor.so`, or `libeditor.dylib`. A debug build of MSVC tries the debug postfix `d` first and resolves `editord.dll` before `editor.dll`, because a debug build and a release build of MSVC link different C runtimes and are not binary compatible. A release build does not try the postfix.
 - `CustomLayout` is reported when the constructor receives a user-provided `PluginFactory`. Its `scanPluginPaths()` and `resolvePluginPath()` overrides can implement recursive packages, another metadata path, or a separate library subdirectory. `PluginSystem` accepts only filesystem plugins returned by this factory.
 
 In Bundle layout, `name` belongs to `BundlePluginFactory`, while `displayName` belongs to `PluginSystem`. They happen to coexist in the same root metadata object and do not describe the same thing.
